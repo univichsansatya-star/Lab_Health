@@ -1,0 +1,6 @@
+{
+  "name": "UIS Health Lab",
+  "description": "University nursing and health laboratory equipment borrowing and inventory management system for Universitas Ichsan Satya.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
