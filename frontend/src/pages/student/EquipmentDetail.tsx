@@ -106,7 +106,7 @@ export const EquipmentDetail: React.FC = () => {
             <div>
               <h4 className="text-xs font-bold text-cyan-900 uppercase tracking-wider">Lokasi Penyimpanan di Lab</h4>
               <p className="text-xs font-semibold text-slate-800 mt-0.5 leading-snug">{equipment.location}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">Petugas: Ns. Hendra Wijaya / Ibu Ratna Dewi</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Petugas laboratorium sesuai jadwal layanan.</p>
             </div>
           </div>
         </div>

@@ -239,7 +239,9 @@ export const StaffBorrowingDetail: React.FC = () => {
           </div>
           <div className="space-y-16">
             <p className="font-semibold text-slate-700">Staff Laboratorium UIS</p>
-            <p className="font-bold underline text-slate-900">Ns. Hendra Wijaya, S.Kep.</p>
+            <p className="font-bold underline text-slate-900">
+              {request.handoverStaffName || request.returnStaffName || 'Petugas Laboratorium UIS'}
+            </p>
           </div>
         </div>
       </div>
