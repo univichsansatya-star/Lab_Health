@@ -54,12 +54,29 @@ TEMPLATES = [{
 }]
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": env.db_url(
-        "DATABASE_URL",
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-    )
-}
+legacy_database = env("DATABASE", default=None)
+if legacy_database:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": legacy_database,
+            "USER": env("USER_DATABASE", default=""),
+            "PASSWORD": env("PASSWORD_DATABASE", default=""),
+            "HOST": env("DATABASE_HOST", default="127.0.0.1"),
+            "PORT": env("DATABASE_PORT", default="3306"),
+            "OPTIONS": {
+                "charset": "utf8mb4",
+                "connect_timeout": 10,
+            },
+        }
+    }
+else:
+    DATABASES = {
+        "default": env.db_url(
+            "DATABASE_URL",
+            default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        )
+    }
 
 AUTH_USER_MODEL = "accounts.User"
 PASSWORD_HASHERS = [

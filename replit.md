@@ -24,4 +24,5 @@ The frontend currently uses its configured API service and local demo storage. T
 ## Environment
 
 - `GEMINI_API_KEY` is an optional Replit Secret used by the frontend server’s `/api/assistant` endpoint. Without it, the rest of the app remains available and the assistant returns its existing configuration message.
-- The Django backend reads `DATABASE_URL` when provided and otherwise falls back to its local SQLite configuration.
+- When the `DATABASE`, `USER_DATABASE`, and `PASSWORD_DATABASE` secrets are present, Django uses the legacy MySQL database with `DATABASE_HOST` and `DATABASE_PORT`. Otherwise it falls back to `DATABASE_URL` and then local SQLite.
+- The current legacy MySQL connection has been verified with read-only queries. It connects successfully, but the configured schema currently exposes no application tables.

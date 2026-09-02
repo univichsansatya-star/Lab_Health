@@ -35,3 +35,9 @@ externalPort = 5000
 [[ports]]
 localPort = 24678
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+DATABASE_HOST = "srv182.niagahoster.com"
+DATABASE_PORT = "3306"
