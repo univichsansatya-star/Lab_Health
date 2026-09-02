@@ -54,8 +54,12 @@ TEMPLATES = [{
 }]
 WSGI_APPLICATION = "config.wsgi.application"
 
-database_url = env("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
-DATABASES = {"default": env.db_url(database_url)}
+DATABASES = {
+    "default": env.db_url(
+        "DATABASE_URL",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    )
+}
 
 AUTH_USER_MODEL = "accounts.User"
 PASSWORD_HASHERS = [
