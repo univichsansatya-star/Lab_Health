@@ -20,10 +20,11 @@ import {
   Award,
   ChevronRight,
 } from 'lucide-react';
-import { LAB_ROOMS } from '@/src/services/mockData';
+import { StorageService } from '@/src/services/storage';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const rooms = StorageService.getRooms();
 
   const categories = [
     {
@@ -328,7 +329,7 @@ export const LandingPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {LAB_ROOMS.map((room) => (
+          {rooms.map((room) => (
             <div
               key={room.id}
               className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs hover:border-cyan-200 transition-all flex flex-col justify-between"

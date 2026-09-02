@@ -23,7 +23,6 @@ import {
   MapPin,
   Eye,
 } from 'lucide-react';
-import { LAB_ROOMS } from '@/src/services/mockData';
 
 const CATEGORIES: EquipmentCategory[] = [
   'Nursing Skills',

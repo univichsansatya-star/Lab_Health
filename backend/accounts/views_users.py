@@ -5,7 +5,21 @@ from rest_framework.permissions import IsAuthenticated
 
 from .models import User
 from .permissions import IsAdminOnly, IsStaffOrAdmin
-from .serializers import UserSerializer
+from .serializers import AdminUserCreateSerializer, UserSerializer
+
+
+class UserCreateView(generics.CreateAPIView):
+    permission_classes = [IsStaffOrAdmin]
+    serializer_class = AdminUserCreateSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(UserSerializer(user).data, status=201)
+
+    def get_queryset(self):
+        return User.objects.all()
 
 
 class UserListView(generics.ListAPIView):

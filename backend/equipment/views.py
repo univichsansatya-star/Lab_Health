@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from accounts.permissions import IsStaffOrAdmin
 from .models import Equipment
@@ -15,6 +15,8 @@ class EquipmentViewSet(viewsets.ModelViewSet):
     ordering = ["name"]
 
     def get_permissions(self):
+        if self.action in {"list", "retrieve"}:
+            return [AllowAny()]
         if self.action in {"create", "update", "partial_update", "destroy"}:
             return [IsStaffOrAdmin()]
         return [IsAuthenticated()]

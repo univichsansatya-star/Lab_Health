@@ -1,0 +1,1 @@
+- [Legacy MySQL visibility](legacy-mysql.md) — connection succeeds, but the selected schema currently exposes no application tables.

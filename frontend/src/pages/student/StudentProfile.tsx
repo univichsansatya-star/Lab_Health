@@ -13,15 +13,13 @@ import {
   Clock,
   CheckCircle2,
   AlertOctagon,
-  Sparkles,
   BookOpen,
-  ArrowRight,
   LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const StudentProfile: React.FC = () => {
-  const { user, logout, switchRoleUser } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -33,7 +31,8 @@ export const StudentProfile: React.FC = () => {
   const returnedOnTime = userRequests.filter((r) => r.status === 'RETURNED').length;
   const overdueCount = userRequests.filter((r) => r.status === 'OVERDUE').length;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    await updateProfile({ phone });
     setSaveSuccess(true);
     setIsEditing(false);
     setTimeout(() => setSaveSuccess(false), 3000);
@@ -72,7 +71,7 @@ export const StudentProfile: React.FC = () => {
             </h1>
 
             <p className="text-xs text-slate-600 font-medium">
-              NIM: <strong className="text-slate-900">{user?.nim_nip}</strong> • {user?.department} • Semester 6
+               NIM: <strong className="text-slate-900">{user?.nim_nip}</strong> • {user?.department} • Semester {user?.semester}
             </p>
 
             <p className="text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1.5 pt-1">
@@ -168,31 +167,6 @@ export const StudentProfile: React.FC = () => {
         </div>
       </div>
 
-      {/* Switch to Staff Portal Demo Box */}
-      <div className="p-6 rounded-3xl bg-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="space-y-1 text-center sm:text-left">
-          <h4 className="font-heading font-bold text-base flex items-center justify-center sm:justify-start gap-2">
-            <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span>Akses Portal Staff & Koordinator Lab</span>
-          </h4>
-          <p className="text-xs text-slate-400">
-            Ingin mencoba alur verifikasi persetujuan, manajemen barcode QR, dan inventaris lab sebagai Staff?
-          </p>
-        </div>
-
-        <Button
-          variant="secondary"
-          size="md"
-          className="bg-cyan-500 hover:bg-cyan-600 text-white border-cyan-400 flex-shrink-0"
-          onClick={() => {
-            switchRoleUser('u4'); // Switch to Ns. Hendra (Staff)
-            navigate('/staff/dashboard');
-          }}
-          rightIcon={<ArrowRight className="w-4 h-4" />}
-        >
-          Masuk Portal Staff Lab
-        </Button>
-      </div>
     </div>
   );
 };

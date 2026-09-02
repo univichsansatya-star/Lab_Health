@@ -38,6 +38,24 @@ class RegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=6)
+
+    class Meta:
+        model = User
+        fields = [
+            "name", "nim_nip", "email", "password", "role", "department",
+            "study_program", "semester", "phone", "avatar",
+        ]
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+
 class CampusTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = "email"
 

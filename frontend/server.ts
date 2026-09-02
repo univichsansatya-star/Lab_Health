@@ -5,8 +5,33 @@ import { createServer as createViteServer } from "vite";
 async function startServer() {
   const app = express();
   const PORT = Number.parseInt(process.env.PORT || "5000", 10);
+  const DJANGO_API_URL = process.env.DJANGO_API_URL || "http://127.0.0.1:8000";
 
   app.use(express.json());
+
+  // Keep browser requests same-origin while Django runs as a separate service.
+  app.use("/backend-api", async (req, res) => {
+    const backendPath = req.originalUrl.replace(/^\/backend-api/, "/api");
+    const headers = new Headers();
+    for (const name of ["accept", "authorization", "content-type"]) {
+      const value = req.get(name);
+      if (value) headers.set(name, value);
+    }
+
+    try {
+      const response = await fetch(new URL(backendPath, DJANGO_API_URL), {
+        method: req.method,
+        headers,
+        body: ["GET", "HEAD"].includes(req.method) ? undefined : JSON.stringify(req.body || {}),
+      });
+      const contentType = response.headers.get("content-type");
+      if (contentType) res.setHeader("Content-Type", contentType);
+      res.status(response.status).send(Buffer.from(await response.arrayBuffer()));
+    } catch (error) {
+      console.error("Django proxy error:", error);
+      res.status(502).json({ detail: "Django backend is unavailable." });
+    }
+  });
 
   // Health check endpoint for Cloud Run container ingress and monitoring
   app.get("/api/health", (req, res) => {

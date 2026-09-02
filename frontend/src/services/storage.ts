@@ -6,234 +6,213 @@ import {
   Notification,
   LabRoom,
 } from '../types';
-import {
-  INITIAL_EQUIPMENT,
-  INITIAL_BORROWING_REQUESTS,
-  INITIAL_USERS,
-  INITIAL_MAINTENANCE_RECORDS,
-  INITIAL_NOTIFICATIONS,
-  LAB_ROOMS,
-} from './mockData';
+import { api, hasAccessToken } from './api';
 
-const KEYS = {
-  USERS: 'uis_healthlab_users',
-  CURRENT_USER: 'uis_healthlab_current_user',
-  EQUIPMENT: 'uis_healthlab_equipment',
-  REQUESTS: 'uis_healthlab_requests',
-  MAINTENANCE: 'uis_healthlab_maintenance',
-  NOTIFICATIONS: 'uis_healthlab_notifications',
-  ROOMS: 'uis_healthlab_rooms',
+type Cache = {
+  currentUser: User | null;
+  users: User[];
+  equipment: Equipment[];
+  requests: BorrowingRequest[];
+  maintenance: MaintenanceRecord[];
+  notifications: Notification[];
+  rooms: LabRoom[];
 };
 
-// Safe JSON Parse
-function getStorage<T>(key: string, fallback: T): T {
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : fallback;
-  } catch (e) {
-    console.error(`Error reading ${key} from storage:`, e);
-    return fallback;
-  }
-}
+const cache: Cache = {
+  currentUser: null,
+  users: [],
+  equipment: [],
+  requests: [],
+  maintenance: [],
+  notifications: [],
+  rooms: [],
+};
 
-function setStorage<T>(key: string, data: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Error writing ${key} to storage:`, e);
-  }
-}
+let bootstrapPromise: Promise<void> | null = null;
+
+const replaceById = <T extends { id: string }>(items: T[], value: T) => {
+  const index = items.findIndex((item) => item.id === value.id);
+  if (index === -1) return [value, ...items];
+  return items.map((item) => (item.id === value.id ? value : item));
+};
+
+const refreshPrivateData = async () => {
+  if (!hasAccessToken()) return;
+
+  const results = await Promise.allSettled([
+    api.auth.getUsers(),
+    api.equipment.getAll(),
+    api.borrowings.getAll(),
+    api.maintenance.getAll(),
+    api.notifications.getAll(),
+    api.rooms.getAll(),
+  ]);
+
+  const [users, equipment, requests, maintenance, notifications, rooms] = results;
+  if (users.status === 'fulfilled') cache.users = users.value;
+  if (equipment.status === 'fulfilled') cache.equipment = equipment.value;
+  if (requests.status === 'fulfilled') cache.requests = requests.value;
+  if (maintenance.status === 'fulfilled') cache.maintenance = maintenance.value;
+  if (notifications.status === 'fulfilled') cache.notifications = notifications.value;
+  if (rooms.status === 'fulfilled') cache.rooms = rooms.value;
+
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      console.warn('Django resource request failed:', result.reason);
+    }
+  });
+};
 
 export const StorageService = {
-  // Initialization
-  initDefaults: () => {
-    if (!localStorage.getItem(KEYS.EQUIPMENT)) {
-      setStorage(KEYS.EQUIPMENT, INITIAL_EQUIPMENT);
-    }
-    if (!localStorage.getItem(KEYS.REQUESTS)) {
-      setStorage(KEYS.REQUESTS, INITIAL_BORROWING_REQUESTS);
-    }
-    if (!localStorage.getItem(KEYS.USERS)) {
-      setStorage(KEYS.USERS, INITIAL_USERS);
-    }
-    if (!localStorage.getItem(KEYS.CURRENT_USER)) {
-      setStorage(KEYS.CURRENT_USER, INITIAL_USERS[0]); // Default to Siti (Student)
-    }
-    if (!localStorage.getItem(KEYS.MAINTENANCE)) {
-      setStorage(KEYS.MAINTENANCE, INITIAL_MAINTENANCE_RECORDS);
-    }
-    if (!localStorage.getItem(KEYS.NOTIFICATIONS)) {
-      setStorage(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    }
-    if (!localStorage.getItem(KEYS.ROOMS)) {
-      setStorage(KEYS.ROOMS, LAB_ROOMS);
-    }
+  bootstrapPublic: async () => {
+    const [equipment, rooms] = await Promise.allSettled([
+      api.equipment.getAll(),
+      api.rooms.getAll(),
+    ]);
+    if (equipment.status === 'fulfilled') cache.equipment = equipment.value;
+    else console.warn('Public equipment request failed:', equipment.reason);
+    if (rooms.status === 'fulfilled') cache.rooms = rooms.value;
+    else console.warn('Public rooms request failed:', rooms.reason);
   },
 
+  bootstrap: async () => {
+    if (bootstrapPromise) return bootstrapPromise;
+    bootstrapPromise = refreshPrivateData().finally(() => {
+      bootstrapPromise = null;
+    });
+    return bootstrapPromise;
+  },
+
+  clear: () => {
+    cache.currentUser = null;
+    cache.users = [];
+    cache.equipment = [];
+    cache.requests = [];
+    cache.maintenance = [];
+    cache.notifications = [];
+    cache.rooms = [];
+  },
+
+  initDefaults: () => undefined,
+
   resetAllData: () => {
-    setStorage(KEYS.EQUIPMENT, INITIAL_EQUIPMENT);
-    setStorage(KEYS.REQUESTS, INITIAL_BORROWING_REQUESTS);
-    setStorage(KEYS.USERS, INITIAL_USERS);
-    setStorage(KEYS.CURRENT_USER, INITIAL_USERS[0]);
-    setStorage(KEYS.MAINTENANCE, INITIAL_MAINTENANCE_RECORDS);
-    setStorage(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    setStorage(KEYS.ROOMS, LAB_ROOMS);
+    throw new Error('Demo data reset is disabled while Django is the data source.');
   },
 
   resetDemoData: () => {
-    StorageService.resetAllData();
+    throw new Error('Demo data reset is disabled while Django is the data source.');
   },
 
-  // Auth / Users
-  getCurrentUser: (): User => {
-    return getStorage<User>(KEYS.CURRENT_USER, INITIAL_USERS[0]);
+  getCurrentUser: () => cache.currentUser,
+
+  setCurrentUser: (user: User | null) => {
+    cache.currentUser = user;
   },
 
-  setCurrentUser: (user: User) => {
-    setStorage(KEYS.CURRENT_USER, user);
-  },
+  getUsers: () => cache.users,
 
-  getUsers: (): User[] => {
-    return getStorage<User[]>(KEYS.USERS, INITIAL_USERS);
-  },
-
-  addUser: (user: User): User => {
-    const users = StorageService.getUsers();
-    const updated = [user, ...users];
-    setStorage(KEYS.USERS, updated);
+  addUser: (user: User) => {
+    cache.users = replaceById(cache.users, user);
     return user;
   },
 
-  createUser: (user: Omit<User, 'id'>): User => {
-    const newUser: User = {
-      ...user,
-      id: `usr-${Date.now()}`,
-    };
-    return StorageService.addUser(newUser);
+  createUser: async (user: Omit<User, 'id' | 'joinedDate'>, password: string) => {
+    const created = await api.users.create(user, password);
+    cache.users = replaceById(cache.users, created);
+    return created;
   },
 
-  updateUser: (updatedUserOrId: User | string, updates?: Partial<User>): User | undefined => {
-    const users = StorageService.getUsers();
-    if (typeof updatedUserOrId === 'string') {
-      const existing = users.find((u) => u.id === updatedUserOrId);
-      if (!existing) return undefined;
-      const merged: User = { ...existing, ...updates };
-      const updated = users.map((u) => (u.id === updatedUserOrId ? merged : u));
-      setStorage(KEYS.USERS, updated);
-      const curr = StorageService.getCurrentUser();
-      if (curr.id === updatedUserOrId) {
-        StorageService.setCurrentUser(merged);
-      }
-      return merged;
-    } else {
-      const updated = users.map((u) => (u.id === updatedUserOrId.id ? updatedUserOrId : u));
-      setStorage(KEYS.USERS, updated);
-      const curr = StorageService.getCurrentUser();
-      if (curr.id === updatedUserOrId.id) {
-        StorageService.setCurrentUser(updatedUserOrId);
-      }
-      return updatedUserOrId;
-    }
+  updateUser: (updatedUserOrId: User | string, updates?: Partial<User>) => {
+    const current =
+      typeof updatedUserOrId === 'string'
+        ? cache.users.find((user) => user.id === updatedUserOrId)
+        : updatedUserOrId;
+    if (!current) return undefined;
+    const updated = typeof updatedUserOrId === 'string' ? { ...current, ...updates } : updatedUserOrId;
+    cache.users = replaceById(cache.users, updated);
+    if (cache.currentUser?.id === updated.id) cache.currentUser = updated;
+    void api.users.update(updated.id, updates || updated).catch((error) => {
+      console.error('Failed to update user in Django:', error);
+    });
+    return updated;
   },
 
-  // Equipment
-  getEquipment: (): Equipment[] => {
-    return getStorage<Equipment[]>(KEYS.EQUIPMENT, INITIAL_EQUIPMENT);
-  },
+  getEquipment: () => cache.equipment,
 
-  getEquipmentById: (id: string): Equipment | undefined => {
-    const list = StorageService.getEquipment();
-    return list.find((item) => item.id === id);
-  },
+  getEquipmentById: (id: string) => cache.equipment.find((item) => item.id === id),
 
-  saveEquipment: (item: Equipment): Equipment => {
-    const list = StorageService.getEquipment();
-    const existingIndex = list.findIndex((eq) => eq.id === item.id);
-    let updated: Equipment[];
-    if (existingIndex >= 0) {
-      updated = list.map((eq) => (eq.id === item.id ? item : eq));
-    } else {
-      updated = [item, ...list];
-    }
-    setStorage(KEYS.EQUIPMENT, updated);
+  saveEquipment: (item: Equipment) => {
+    cache.equipment = replaceById(cache.equipment, item);
+    void api.equipment.update(item).then((saved) => {
+      cache.equipment = replaceById(cache.equipment, saved);
+    }).catch((error) => {
+      console.error('Failed to update equipment in Django:', error);
+    });
     return item;
   },
 
-  createEquipment: (item: Omit<Equipment, 'id'>): Equipment => {
-    const newEq: Equipment = {
+  createEquipment: (item: Omit<Equipment, 'id'>) => {
+    const pending = {
       ...item,
-      id: `eq-${Date.now()}`,
+      id: `pending-${Date.now()}`,
+      createdAt: new Date().toISOString(),
     };
-    return StorageService.saveEquipment(newEq);
+    cache.equipment = [pending, ...cache.equipment];
+    void api.equipment.create(item).then((created) => {
+      cache.equipment = replaceById(
+        cache.equipment.filter((equipment) => equipment.id !== pending.id),
+        created,
+      );
+    }).catch((error) => {
+      console.error('Failed to create equipment in Django:', error);
+    });
+    return pending;
   },
 
-  updateEquipment: (id: string, updates: Partial<Equipment>): Equipment | undefined => {
-    const list = StorageService.getEquipment();
-    const existing = list.find((eq) => eq.id === id);
+  updateEquipment: (id: string, updates: Partial<Equipment>) => {
+    const existing = cache.equipment.find((item) => item.id === id);
     if (!existing) return undefined;
-    const merged: Equipment = { ...existing, ...updates };
-    StorageService.saveEquipment(merged);
-    return merged;
+    const updated = { ...existing, ...updates };
+    cache.equipment = replaceById(cache.equipment, updated);
+    void api.equipment.update(updated).then((saved) => {
+      cache.equipment = replaceById(cache.equipment, saved);
+    }).catch((error) => {
+      console.error('Failed to update equipment in Django:', error);
+    });
+    return updated;
   },
 
-  deleteEquipment: (id: string): boolean => {
-    const list = StorageService.getEquipment();
-    const updated = list.filter((eq) => eq.id !== id);
-    setStorage(KEYS.EQUIPMENT, updated);
+  deleteEquipment: (id: string) => {
+    cache.equipment = cache.equipment.filter((item) => item.id !== id);
+    void api.equipment.delete(id).catch((error) => {
+      console.error('Failed to delete equipment in Django:', error);
+    });
     return true;
   },
 
-  // Borrowing Requests
-  getRequests: (): BorrowingRequest[] => {
-    return getStorage<BorrowingRequest[]>(KEYS.REQUESTS, INITIAL_BORROWING_REQUESTS);
-  },
+  getRequests: () => cache.requests,
 
-  getRequestById: (id: string): BorrowingRequest | undefined => {
-    const list = StorageService.getRequests();
-    return list.find((req) => req.id === id || req.ticketNumber === id);
-  },
+  getRequestById: (id: string) =>
+    cache.requests.find((request) => request.id === id || request.ticketNumber === id),
 
-  createRequest: (req: Omit<BorrowingRequest, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>): BorrowingRequest => {
-    const list = StorageService.getRequests();
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const dateStr = new Date().toISOString().slice(0, 7).replace('-', '');
-    const newRequest: BorrowingRequest = {
-      ...req,
-      id: `req-${Date.now()}`,
-      ticketNumber: `REQ-${dateStr}-${randomNum}`,
+  createRequest: (data: Omit<BorrowingRequest, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) => {
+    const pending = {
+      ...data,
+      id: `pending-${Date.now()}`,
+      ticketNumber: `PENDING-${Date.now()}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-
-    // Decrement available equipment quantity immediately or when approved
-    const eqList = StorageService.getEquipment();
-    const updatedEq = eqList.map((eq) => {
-      const match = req.items.find((i) => i.equipmentId === eq.id);
-      if (match) {
-        return {
-          ...eq,
-          availableQuantity: Math.max(0, eq.availableQuantity - match.quantity),
-          borrowedQuantity: eq.borrowedQuantity + match.quantity,
-        };
-      }
-      return eq;
+    cache.requests = [pending, ...cache.requests];
+    void api.borrowings.create(data).then((created) => {
+      cache.requests = replaceById(
+        cache.requests.filter((request) => request.id !== pending.id),
+        created,
+      );
+    }).catch((error) => {
+      console.error('Failed to create borrowing request in Django:', error);
     });
-    setStorage(KEYS.EQUIPMENT, updatedEq);
-
-    const updated = [newRequest, ...list];
-    setStorage(KEYS.REQUESTS, updated);
-
-    // Add notification for staff
-    StorageService.addNotification({
-      targetRole: 'nurse_staff',
-      title: 'Permohonan Peminjaman Masuk',
-      message: `${req.userName} mengajukan peminjaman (${newRequest.ticketNumber}) untuk ${req.purpose}.`,
-      type: 'request_status',
-      isRead: false,
-      link: `/staff/requests`,
-    });
-
-    return newRequest;
+    return pending;
   },
 
   updateRequestStatus: (
@@ -249,12 +228,11 @@ export const StorageService = {
           fineAmount?: number;
           actualReturnDate?: string;
         },
-    fineAmountOptional?: number
-  ): BorrowingRequest | undefined => {
-    const list = StorageService.getRequests();
-    let targetReq: BorrowingRequest | undefined;
-
-    const detailsObj =
+    fineAmountOptional?: number,
+  ) => {
+    const existing = StorageService.getRequestById(id);
+    if (!existing) return undefined;
+    const details =
       typeof detailsOrNote === 'string'
         ? {
             adminNotes: detailsOrNote,
@@ -262,98 +240,41 @@ export const StorageService = {
             fineAmount: fineAmountOptional,
           }
         : detailsOrNote || {};
-
-    const updated = list.map((req) => {
-      if (req.id === id || req.ticketNumber === id) {
-        targetReq = {
-          ...req,
-          status,
-          ...detailsObj,
-          updatedAt: new Date().toISOString(),
-        };
-        return targetReq;
-      }
-      return req;
+    const updated = { ...existing, status, ...details, updatedAt: new Date().toISOString() };
+    cache.requests = replaceById(cache.requests, updated);
+    void api.borrowings.updateStatus(existing.id, status, details).then((saved) => {
+      cache.requests = replaceById(cache.requests, saved);
+    }).catch((error) => {
+      console.error('Failed to update borrowing request in Django:', error);
     });
-
-    if (targetReq) {
-      setStorage(KEYS.REQUESTS, updated);
-
-      // If returned or rejected or cancelled, replenish equipment quantity
-      if (status === 'RETURNED' || status === 'REJECTED' || status === 'CANCELLED') {
-        const eqList = StorageService.getEquipment();
-        const updatedEq = eqList.map((eq) => {
-          const match = targetReq!.items.find((i) => i.equipmentId === eq.id);
-          if (match) {
-            return {
-              ...eq,
-              availableQuantity: Math.min(eq.totalQuantity, eq.availableQuantity + match.quantity),
-              borrowedQuantity: Math.max(0, eq.borrowedQuantity - match.quantity),
-            };
-          }
-          return eq;
-        });
-        setStorage(KEYS.EQUIPMENT, updatedEq);
-      }
-
-      // Add user notification
-      StorageService.addNotification({
-        userId: targetReq.userId,
-        title: `Status Peminjaman: ${status}`,
-        message: `Tiket ${targetReq.ticketNumber} sekarang berstatus: ${status}.`,
-        type: status === 'OVERDUE' ? 'overdue' : 'request_status',
-        isRead: false,
-        link: `/student/borrowings/${targetReq.id}`,
-      });
-    }
-
-    return targetReq;
+    return updated;
   },
 
-  // Maintenance
-  getMaintenanceRecords: (): MaintenanceRecord[] => {
-    return getStorage<MaintenanceRecord[]>(KEYS.MAINTENANCE, INITIAL_MAINTENANCE_RECORDS);
-  },
+  getMaintenanceRecords: () => cache.maintenance,
 
-  getMaintenanceLogs: (): MaintenanceRecord[] => {
-    return StorageService.getMaintenanceRecords();
-  },
+  getMaintenanceLogs: () => cache.maintenance,
 
-  addMaintenanceRecord: (
-    record: Omit<MaintenanceRecord, 'id' | 'ticketNumber' | 'reportedDate'>
-  ): MaintenanceRecord => {
-    const list = StorageService.getMaintenanceRecords();
-    const dateStr = new Date().toISOString().slice(0, 7).replace('-', '');
-    const rand = Math.floor(10 + Math.random() * 90);
-    const newRecord: MaintenanceRecord = {
-      ...record,
-      id: `maint-${Date.now()}`,
-      ticketNumber: `MNT-${dateStr}-${rand}`,
+  addMaintenanceRecord: (data: Omit<MaintenanceRecord, 'id' | 'ticketNumber' | 'reportedDate'>) => {
+    const pending = {
+      ...data,
+      id: `pending-${Date.now()}`,
+      ticketNumber: `PENDING-${Date.now()}`,
       reportedDate: new Date().toISOString().slice(0, 10),
     };
-
-    // Update equipment status
-    const eqList = StorageService.getEquipment();
-    const updatedEq = eqList.map((eq) => {
-      if (eq.id === record.equipmentId) {
-        return {
-          ...eq,
-          maintenanceQuantity: eq.maintenanceQuantity + 1,
-          availableQuantity: Math.max(0, eq.availableQuantity - 1),
-          condition: 'MAINTENANCE_REQUIRED' as const,
-        };
-      }
-      return eq;
+    cache.maintenance = [pending, ...cache.maintenance];
+    void api.maintenance.create(data).then((created) => {
+      cache.maintenance = replaceById(
+        cache.maintenance.filter((record) => record.id !== pending.id),
+        created,
+      );
+    }).catch((error) => {
+      console.error('Failed to create maintenance record in Django:', error);
     });
-    setStorage(KEYS.EQUIPMENT, updatedEq);
-
-    const updated = [newRecord, ...list];
-    setStorage(KEYS.MAINTENANCE, updated);
-    return newRecord;
+    return pending;
   },
 
-  createMaintenanceLog: (record: any): MaintenanceRecord => {
-    return StorageService.addMaintenanceRecord({
+  createMaintenanceLog: (record: any) =>
+    StorageService.addMaintenanceRecord({
       equipmentId: record.equipmentId,
       equipmentName: record.equipmentName,
       equipmentCode: record.equipmentCode,
@@ -364,90 +285,56 @@ export const StorageService = {
       cost: record.cost,
       notes: record.description,
       technician: record.performedBy,
-    });
-  },
+    }),
 
-  updateMaintenanceLog: (id: string, updates: any) => {
-    return StorageService.updateMaintenanceStatus(id, updates.status || 'COMPLETED', updates.description, updates.cost);
-  },
+  updateMaintenanceLog: (id: string, updates: any) =>
+    StorageService.updateMaintenanceStatus(id, updates.status || 'COMPLETED', updates.description, updates.cost),
 
   updateMaintenanceStatus: (
     id: string,
     status: MaintenanceRecord['status'],
     notes?: string,
-    cost?: number
-  ): MaintenanceRecord | undefined => {
-    const list = StorageService.getMaintenanceRecords();
-    let target: MaintenanceRecord | undefined;
-    const updated = list.map((m) => {
-      if (m.id === id) {
-        target = {
-          ...m,
-          status,
-          notes: notes || m.notes,
-          cost: cost !== undefined ? cost : m.cost,
-          completedDate: status === 'COMPLETED' ? new Date().toISOString().slice(0, 10) : m.completedDate,
-        };
-        return target;
-      }
-      return m;
+    cost?: number,
+  ) => {
+    const existing = cache.maintenance.find((record) => record.id === id);
+    if (!existing) return undefined;
+    const updated = { ...existing, status, notes: notes || existing.notes, cost };
+    cache.maintenance = replaceById(cache.maintenance, updated);
+    void api.maintenance.updateStatus(id, status, notes, cost).then((saved) => {
+      cache.maintenance = replaceById(cache.maintenance, saved);
+    }).catch((error) => {
+      console.error('Failed to update maintenance record in Django:', error);
     });
-
-    if (target) {
-      setStorage(KEYS.MAINTENANCE, updated);
-
-      if (status === 'COMPLETED') {
-        const eqList = StorageService.getEquipment();
-        const updatedEq = eqList.map((eq) => {
-          if (eq.id === target!.equipmentId) {
-            return {
-              ...eq,
-              maintenanceQuantity: Math.max(0, eq.maintenanceQuantity - 1),
-              availableQuantity: Math.min(eq.totalQuantity, eq.availableQuantity + 1),
-              condition: 'GOOD' as const,
-              lastInspectionDate: new Date().toISOString().slice(0, 10),
-            };
-          }
-          return eq;
-        });
-        setStorage(KEYS.EQUIPMENT, updatedEq);
-      }
-    }
-
-    return target;
+    return updated;
   },
 
-  // Notifications
-  getNotifications: (): Notification[] => {
-    return getStorage<Notification[]>(KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-  },
+  getNotifications: () => cache.notifications,
 
-  addNotification: (notif: Omit<Notification, 'id' | 'createdAt'>): Notification => {
-    const list = StorageService.getNotifications();
-    const newNotif: Notification = {
-      ...notif,
-      id: `notif-${Date.now()}`,
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => {
+    const pending = {
+      ...notification,
+      id: `pending-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    const updated = [newNotif, ...list];
-    setStorage(KEYS.NOTIFICATIONS, updated);
-    return newNotif;
+    cache.notifications = [pending, ...cache.notifications];
+    return pending;
   },
 
   markNotificationAsRead: (id: string) => {
-    const list = StorageService.getNotifications();
-    const updated = list.map((n) => (n.id === id ? { ...n, isRead: true } : n));
-    setStorage(KEYS.NOTIFICATIONS, updated);
+    cache.notifications = cache.notifications.map((notification) =>
+      notification.id === id ? { ...notification, isRead: true } : notification,
+    );
+    void api.notifications.markAsRead(id).catch((error) => {
+      console.error('Failed to mark notification in Django:', error);
+    });
   },
 
   markAllNotificationsAsRead: () => {
-    const list = StorageService.getNotifications();
-    const updated = list.map((n) => ({ ...n, isRead: true }));
-    setStorage(KEYS.NOTIFICATIONS, updated);
+    cache.notifications = cache.notifications.map((notification) => ({ ...notification, isRead: true }));
+    void api.notifications.markAllAsRead().catch((error) => {
+      console.error('Failed to mark notifications in Django:', error);
+    });
   },
 
-  // Rooms
-  getRooms: (): LabRoom[] => {
-    return getStorage<LabRoom[]>(KEYS.ROOMS, LAB_ROOMS);
-  },
+  getRooms: () => cache.rooms,
 };

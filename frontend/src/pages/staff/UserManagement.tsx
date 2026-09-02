@@ -23,6 +23,7 @@ export const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState('ALL');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -30,6 +31,7 @@ export const UserManagement: React.FC = () => {
     phone: '',
     department: 'S1 Keperawatan',
     role: 'student' as UserRole,
+    password: '',
   });
 
   const allRequests = StorageService.getRequests();
@@ -46,15 +48,28 @@ export const UserManagement: React.FC = () => {
     return true;
   });
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser = StorageService.createUser({
-      ...formData,
-      status: 'ACTIVE',
-      avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
-    });
-    setUsers(StorageService.getUsers());
-    setIsAddModalOpen(false);
+    setFormError(null);
+    try {
+      await StorageService.createUser(
+        {
+          name: formData.name,
+          email: formData.email,
+          nim_nip: formData.nim_nip,
+          phone: formData.phone,
+          department: formData.department,
+          role: formData.role,
+          status: 'ACTIVE',
+          avatar: undefined,
+        },
+        formData.password,
+      );
+      setUsers(StorageService.getUsers());
+      setIsAddModalOpen(false);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Gagal menyimpan pengguna.');
+    }
   };
 
   const handleToggleStatus = (id: string) => {
@@ -268,6 +283,18 @@ export const UserManagement: React.FC = () => {
               <option value="UPT Laboratorium Kesehatan">UPT Laboratorium Kesehatan</option>
             </Select>
           </div>
+
+          <Input
+            label="Password Awal"
+            type="password"
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            placeholder="Minimal 6 karakter"
+            minLength={6}
+            required
+          />
+
+          {formError && <p className="text-xs font-medium text-rose-600">{formError}</p>}
 
           <div className="pt-2 flex items-center justify-end gap-2">
             <Button variant="ghost" size="sm" type="button" onClick={() => setIsAddModalOpen(false)}>

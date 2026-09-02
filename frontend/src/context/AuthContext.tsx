@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { api } from '../services/api';
+import { api, hasAccessToken } from '../services/api';
 import { StorageService } from '../services/storage';
 
 interface AuthContextType {
@@ -8,9 +8,12 @@ interface AuthContextType {
   role: UserRole;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (emailOrNim: string, role?: string) => Promise<User>;
+  login: (emailOrNim: string, password: string) => Promise<User>;
+  register: (
+    userData: Omit<User, 'id' | 'status' | 'joinedDate'>,
+    password: string,
+  ) => Promise<User>;
   logout: () => void;
-  switchRoleUser: (userId: string) => Promise<void>;
   updateProfile: (updated: Partial<User>) => Promise<void>;
 }
 
@@ -21,19 +24,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    StorageService.initDefaults();
+    if (!hasAccessToken()) {
+      setIsLoading(false);
+      return;
+    }
+
     api.auth
       .getCurrentUser()
-      .then((curr) => {
+      .then(async (curr) => {
+        await StorageService.bootstrap();
+        StorageService.setCurrentUser(curr);
         setUser(curr);
+      })
+      .catch(() => {
+        api.auth.logout();
+        StorageService.clear();
+        setUser(null);
       })
       .finally(() => setIsLoading(false));
   }, []);
 
-  const login = async (emailOrNim: string, role?: string) => {
+  const login = async (emailOrNim: string, password: string) => {
     setIsLoading(true);
     try {
-      const loggedUser = await api.auth.login(emailOrNim, role);
+      const loggedUser = await api.auth.login(emailOrNim, password);
+      await StorageService.bootstrap();
+      StorageService.setCurrentUser(loggedUser);
       setUser(loggedUser);
       return loggedUser;
     } finally {
@@ -41,27 +57,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    // For demo purposes, we can switch back to public or default student
-    const defaultUser = StorageService.getUsers()[0];
-    StorageService.setCurrentUser(defaultUser);
-    setUser(defaultUser);
-  };
-
-  const switchRoleUser = async (userId: string) => {
+  const register = async (
+    userData: Omit<User, 'id' | 'status' | 'joinedDate'>,
+    password: string,
+  ) => {
     setIsLoading(true);
     try {
-      const switched = await api.auth.switchUser(userId);
-      setUser(switched);
+      const registeredUser = await api.auth.register(userData, password);
+      await StorageService.bootstrap();
+      StorageService.setCurrentUser(registeredUser);
+      setUser(registeredUser);
+      return registeredUser;
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const logout = () => {
+    api.auth.logout();
+    StorageService.clear();
+    setUser(null);
   };
 
   const updateProfile = async (updated: Partial<User>) => {
     if (!user) return;
     const merged: User = { ...user, ...updated };
     const saved = await api.auth.updateUser(merged);
+    StorageService.setCurrentUser(saved);
     setUser(saved);
   };
 
@@ -76,8 +98,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated,
         isLoading,
         login,
+        register,
         logout,
-        switchRoleUser,
         updateProfile,
       }}
     >

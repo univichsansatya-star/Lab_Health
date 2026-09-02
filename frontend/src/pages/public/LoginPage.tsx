@@ -14,11 +14,9 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  Sparkles,
   ArrowRight,
   Stethoscope,
 } from 'lucide-react';
-import { INITIAL_USERS } from '@/src/services/mockData';
 
 const loginSchema = z.object({
   emailOrNim: z.string().min(3, 'NIM atau Email kampus wajib diisi'),
@@ -29,7 +27,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
-  const { login, isLoading, switchRoleUser } = useAuth();
+  const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -37,13 +35,12 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      emailOrNim: 'siti.nurhaliza@mhs.ichsansatya.ac.id',
-      password: 'password123',
+      emailOrNim: '',
+      password: '',
       rememberMe: true,
     },
   });
@@ -51,7 +48,7 @@ export const LoginPage: React.FC = () => {
   const onSubmit = async (data: LoginFormValues) => {
     setAuthError(null);
     try {
-      const user = await login(data.emailOrNim);
+      const user = await login(data.emailOrNim, data.password);
       if (user.role === 'student') {
         navigate('/student/dashboard');
       } else {
@@ -59,17 +56,6 @@ export const LoginPage: React.FC = () => {
       }
     } catch (e: any) {
       setAuthError(e.message || 'Gagal masuk. Periksa kembali NIM/Email dan password Anda.');
-    }
-  };
-
-  const handleQuickDemoLogin = async (userPreset: (typeof INITIAL_USERS)[0]) => {
-    await switchRoleUser(userPreset.id);
-    setValue('emailOrNim', userPreset.email);
-    setValue('password', 'password123');
-    if (userPreset.role === 'student') {
-      navigate('/student/dashboard');
-    } else {
-      navigate('/staff/dashboard');
     }
   };
 
@@ -87,40 +73,6 @@ export const LoginPage: React.FC = () => {
           <p className="text-xs text-slate-500 max-w-xs mx-auto">
             Gunakan akun SIAKAD atau kredensial NIP/NIM Universitas Ichsan Satya
           </p>
-        </div>
-
-        {/* Quick Demo Selector Box */}
-        <div className="bg-cyan-50/80 border border-cyan-200/80 rounded-2xl p-3.5 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-900">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
-            <span>Pilih Cepat Akun Demo (1-Click Login):</span>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin(INITIAL_USERS[0])}
-              className="px-2 py-1.5 rounded-xl bg-white hover:bg-cyan-100/60 border border-cyan-200 text-[11px] font-bold text-slate-800 transition-all text-center flex flex-col items-center"
-            >
-              <span>Mahasiswa</span>
-              <span className="text-[9px] text-cyan-700 font-normal">S1 Ners</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin(INITIAL_USERS[3])}
-              className="px-2 py-1.5 rounded-xl bg-white hover:bg-cyan-100/60 border border-cyan-200 text-[11px] font-bold text-slate-800 transition-all text-center flex flex-col items-center"
-            >
-              <span>Staff Lab</span>
-              <span className="text-[9px] text-cyan-700 font-normal">Ns. Hendra</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLogin(INITIAL_USERS[4])}
-              className="px-2 py-1.5 rounded-xl bg-white hover:bg-cyan-100/60 border border-cyan-200 text-[11px] font-bold text-slate-800 transition-all text-center flex flex-col items-center"
-            >
-              <span>Admin / Koord</span>
-              <span className="text-[9px] text-cyan-700 font-normal">Ibu Ratna</span>
-            </button>
-          </div>
         </div>
 
         {/* Main Login Form */}

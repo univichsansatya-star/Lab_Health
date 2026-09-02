@@ -1,4 +1,3 @@
-import { StorageService } from './storage';
 import {
   Equipment,
   BorrowingRequest,
@@ -8,119 +7,200 @@ import {
   LabRoom,
 } from '../types';
 
-// The API base URL configured via environment variable
-export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://api.healthlab.ichsansatya.ac.id/v1';
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/backend-api';
 
-// Simulate slight realistic network latency for TanStack Query
-const delay = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
+const ACCESS_TOKEN_KEY = 'uis_healthlab_access_token';
+const REFRESH_TOKEN_KEY = 'uis_healthlab_refresh_token';
+
+type AuthResponse = {
+  access: string;
+  refresh: string;
+  user: User;
+};
+
+const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
+
+const setTokens = (data: Pick<AuthResponse, 'access' | 'refresh'>) => {
+  localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
+  localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
+};
+
+const clearTokens = () => {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+const refreshAccessToken = async () => {
+  const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refresh) return false;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ refresh }),
+    });
+    if (!response.ok) return false;
+    const payload = (await response.json()) as { access?: string };
+    if (!payload.access) return false;
+    localStorage.setItem(ACCESS_TOKEN_KEY, payload.access);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const request = async <T>(
+  path: string,
+  options: RequestInit = {},
+  authenticated = true,
+  retryAfterRefresh = true,
+): Promise<T> => {
+  const headers = new Headers(options.headers);
+  headers.set('Accept', 'application/json');
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (authenticated) {
+    const token = getAccessToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const raw = await response.text();
+  let payload: unknown = null;
+
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = raw;
+    }
+  }
+
+  if (
+    response.status === 401 &&
+    authenticated &&
+    retryAfterRefresh &&
+    !path.startsWith('/auth/refresh/')
+  ) {
+    if (await refreshAccessToken()) {
+      return request<T>(path, options, authenticated, false);
+    }
+  }
+
+  if (!response.ok) {
+    const detail =
+      typeof payload === 'object' && payload !== null && 'detail' in payload
+        ? String((payload as { detail: unknown }).detail)
+        : `Request failed with status ${response.status}`;
+    const error = new Error(detail);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
+  }
+
+  return payload as T;
+};
+
+const json = (value: unknown): RequestInit => ({
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(value),
+});
+
+export const hasAccessToken = () => Boolean(getAccessToken());
 
 export const api = {
-  // Auth & Profile
   auth: {
-    getCurrentUser: async (): Promise<User> => {
-      await delay();
-      return StorageService.getCurrentUser();
-    },
-    login: async (emailOrNim: string, _role?: string): Promise<User> => {
-      await delay(200);
-      const users = StorageService.getUsers();
-      const found = users.find(
-        (u) =>
-          u.email.toLowerCase() === emailOrNim.toLowerCase() ||
-          u.nim_nip.toLowerCase() === emailOrNim.toLowerCase()
+    getCurrentUser: () => request<User>('/auth/me/'),
+
+    login: async (emailOrNim: string, password: string): Promise<User> => {
+      const response = await request<AuthResponse>(
+        '/auth/login/',
+        json({ emailOrNim, password }),
+        false,
       );
-      if (found) {
-        StorageService.setCurrentUser(found);
-        return found;
-      }
-      // Fallback first user if demo
-      const def = users[0];
-      StorageService.setCurrentUser(def);
-      return def;
+      setTokens(response);
+      return response.user;
     },
-    switchUser: async (userId: string): Promise<User> => {
-      await delay(100);
-      const users = StorageService.getUsers();
-      const found = users.find((u) => u.id === userId) || users[0];
-      StorageService.setCurrentUser(found);
-      return found;
+
+    register: async (
+      userData: Omit<User, 'id' | 'status' | 'joinedDate'>,
+      password: string,
+    ): Promise<User> => {
+      const response = await request<AuthResponse>(
+        '/auth/register/',
+        json({ ...userData, password }),
+        false,
+      );
+      setTokens(response);
+      return response.user;
     },
-    register: async (userData: Omit<User, 'id' | 'status' | 'joinedDate'>): Promise<User> => {
-      await delay(300);
-      const newUser: User = {
-        ...userData,
-        id: `usr-${Date.now()}`,
-        status: 'ACTIVE',
-        joinedDate: new Date().toISOString().slice(0, 10),
-      };
-      StorageService.addUser(newUser);
-      StorageService.setCurrentUser(newUser);
-      return newUser;
+
+    logout: () => {
+      clearTokens();
     },
-    getUsers: async (): Promise<User[]> => {
-      await delay();
-      return StorageService.getUsers();
-    },
-    updateUser: async (user: User): Promise<User> => {
-      await delay();
-      return StorageService.updateUser(user);
-    },
+
+    getUsers: () => request<User[]>('/users/'),
+
+    updateUser: (user: User) =>
+      request<User>('/auth/me/', {
+        ...json(user),
+        method: 'PATCH',
+      }),
   },
 
-  // Equipment
+  users: {
+    create: (user: Omit<User, 'id' | 'joinedDate'>, password: string) => {
+      const { status: _status, ...payload } = user;
+      return request<User>('/users/create/', {
+        ...json({ ...payload, password }),
+        method: 'POST',
+      });
+    },
+
+    update: (id: string, updates: Partial<User>) =>
+      request<User>(`/users/${id}/`, {
+        ...json(updates),
+        method: 'PATCH',
+      }),
+  },
+
   equipment: {
-    getAll: async (): Promise<Equipment[]> => {
-      await delay(150);
-      return StorageService.getEquipment();
-    },
-    getById: async (id: string): Promise<Equipment> => {
-      await delay(100);
-      const item = StorageService.getEquipmentById(id);
-      if (!item) throw new Error('Equipment not found');
-      return item;
-    },
-    create: async (item: Omit<Equipment, 'id' | 'createdAt'>): Promise<Equipment> => {
-      await delay(250);
-      const newEq: Equipment = {
-        ...item,
-        id: `eq-${Date.now()}`,
-        createdAt: new Date().toISOString().slice(0, 10),
-      };
-      return StorageService.saveEquipment(newEq);
-    },
-    update: async (item: Equipment): Promise<Equipment> => {
-      await delay(200);
-      return StorageService.saveEquipment(item);
-    },
-    delete: async (id: string): Promise<boolean> => {
-      await delay(150);
-      return StorageService.deleteEquipment(id);
+    getAll: () => request<Equipment[]>('/equipment/'),
+
+    getById: (id: string) => request<Equipment>(`/equipment/${id}/`),
+
+    create: (item: Omit<Equipment, 'id'>) =>
+      request<Equipment>('/equipment/', {
+        ...json(item),
+        method: 'POST',
+      }),
+
+    update: (item: Equipment) =>
+      request<Equipment>(`/equipment/${item.id}/`, {
+        ...json(item),
+        method: 'PATCH',
+      }),
+
+    delete: async (id: string) => {
+      await request<unknown>(`/equipment/${id}/`, { method: 'DELETE' });
+      return true;
     },
   },
 
-  // Borrowing Requests
   borrowings: {
-    getAll: async (userId?: string): Promise<BorrowingRequest[]> => {
-      await delay(150);
-      const list = StorageService.getRequests();
-      if (userId) {
-        return list.filter((r) => r.userId === userId);
-      }
-      return list;
-    },
-    getById: async (id: string): Promise<BorrowingRequest> => {
-      await delay(100);
-      const req = StorageService.getRequestById(id);
-      if (!req) throw new Error('Borrowing request not found');
-      return req;
-    },
-    create: async (
-      data: Omit<BorrowingRequest, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>
-    ): Promise<BorrowingRequest> => {
-      await delay(300);
-      return StorageService.createRequest(data);
-    },
-    updateStatus: async (
+    getAll: () => request<BorrowingRequest[]>('/borrowings/'),
+
+    getById: (id: string) => request<BorrowingRequest>(`/borrowings/${id}/`),
+
+    create: (data: Omit<BorrowingRequest, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) =>
+      request<BorrowingRequest>('/borrowings/', {
+        ...json(data),
+        method: 'POST',
+      }),
+
+    updateStatus: (
       id: string,
       status: BorrowingRequest['status'],
       details?: {
@@ -130,73 +210,45 @@ export const api = {
         returnStaffName?: string;
         fineAmount?: number;
         actualReturnDate?: string;
-      }
-    ): Promise<BorrowingRequest> => {
-      await delay(200);
-      const res = StorageService.updateRequestStatus(id, status, details);
-      if (!res) throw new Error('Failed to update request');
-      return res;
-    },
+      },
+    ) =>
+      request<BorrowingRequest>(`/borrowings/${id}/update-status/`, {
+        ...json({ status, ...details }),
+        method: 'POST',
+      }),
   },
 
-  // Maintenance
   maintenance: {
-    getAll: async (): Promise<MaintenanceRecord[]> => {
-      await delay(150);
-      return StorageService.getMaintenanceRecords();
-    },
-    create: async (
-      data: Omit<MaintenanceRecord, 'id' | 'ticketNumber' | 'reportedDate'>
-    ): Promise<MaintenanceRecord> => {
-      await delay(250);
-      return StorageService.addMaintenanceRecord(data);
-    },
-    updateStatus: async (
+    getAll: () => request<MaintenanceRecord[]>('/maintenance/'),
+
+    create: (data: Omit<MaintenanceRecord, 'id' | 'ticketNumber' | 'reportedDate'>) =>
+      request<MaintenanceRecord>('/maintenance/', {
+        ...json(data),
+        method: 'POST',
+      }),
+
+    updateStatus: (
       id: string,
       status: MaintenanceRecord['status'],
       notes?: string,
-      cost?: number
-    ): Promise<MaintenanceRecord> => {
-      await delay(200);
-      const res = StorageService.updateMaintenanceStatus(id, status, notes, cost);
-      if (!res) throw new Error('Maintenance record not found');
-      return res;
-    },
+      cost?: number,
+    ) =>
+      request<MaintenanceRecord>(`/maintenance/${id}/update-status/`, {
+        ...json({ status, notes, cost }),
+        method: 'POST',
+      }),
   },
 
-  // Notifications
   notifications: {
-    getAll: async (userId?: string, role?: string): Promise<Notification[]> => {
-      await delay(100);
-      const list = StorageService.getNotifications();
-      return list.filter((n) => {
-        if (n.userId && userId && n.userId === userId) return true;
-        if (n.targetRole && role && (n.targetRole === role || n.targetRole === 'all')) return true;
-        if (!n.userId && !n.targetRole) return true;
-        return false;
-      });
-    },
-    markAsRead: async (id: string): Promise<void> => {
-      StorageService.markNotificationAsRead(id);
-    },
-    markAllAsRead: async (): Promise<void> => {
-      StorageService.markAllNotificationsAsRead();
-    },
+    getAll: (_userId?: string, _role?: string) => request<Notification[]>('/notifications/'),
+
+    markAsRead: (id: string) =>
+      request<Notification>(`/notifications/${id}/read/`, { method: 'POST' }),
+
+    markAllAsRead: () => request<{ updated: number }>('/notifications/read-all/', { method: 'POST' }),
   },
 
-  // Rooms
   rooms: {
-    getAll: async (): Promise<LabRoom[]> => {
-      await delay(100);
-      return StorageService.getRooms();
-    },
-  },
-
-  // System
-  system: {
-    resetDemoData: async () => {
-      await delay(300);
-      StorageService.resetAllData();
-    },
+    getAll: () => request<LabRoom[]>('/rooms/'),
   },
 };
