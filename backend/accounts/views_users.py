@@ -8,14 +8,25 @@ from .permissions import IsAdminOnly, IsStaffOrAdmin
 from .serializers import AdminUserCreateSerializer, UserSerializer
 
 
-class UserListView(generics.ListCreateAPIView):
+class UserCreateView(generics.CreateAPIView):
+    permission_classes = [IsStaffOrAdmin]
+    serializer_class = AdminUserCreateSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(UserSerializer(user).data, status=201)
+
+    def get_queryset(self):
+        return User.objects.all()
+
+
+class UserListView(generics.ListAPIView):
     permission_classes = [IsStaffOrAdmin]
     serializer_class = UserSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "nim_nip", "email", "department"]
-
-    def get_serializer_class(self):
-        return AdminUserCreateSerializer if self.request.method == "POST" else UserSerializer
 
     def get_queryset(self):
         queryset = User.objects.all().order_by("-joined_date", "name")

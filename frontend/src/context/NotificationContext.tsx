@@ -22,8 +22,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setNotifications([]);
       return;
     }
+
     try {
-      const data = await api.notifications.getAll();
+      const data = await api.notifications.getAll(user?.id, user?.role);
       setNotifications(data);
     } catch (e) {
       console.error('Failed to load notifications', e);

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '@/src/services/api';
+import React, { useState } from 'react';
+import { StorageService } from '@/src/services/storage';
 import { User, UserRole } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select } from '@/src/components/ui/Input';
@@ -18,11 +18,12 @@ import {
 } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>(() => StorageService.getUsers());
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -30,15 +31,10 @@ export const UserManagement: React.FC = () => {
     phone: '',
     department: 'S1 Keperawatan',
     role: 'student' as UserRole,
+    password: '',
   });
 
-  const [allRequests, setAllRequests] = useState<any[]>([]);
-
-  useEffect(() => {
-    Promise.all([api.users.getAll(), api.borrowings.getAll()])
-      .then(([userList, requests]) => { setUsers(userList); setAllRequests(requests); })
-      .catch(console.error);
-  }, []);
+  const allRequests = StorageService.getRequests();
 
   const filteredUsers = users.filter((u) => {
     if (roleFilter !== 'ALL' && u.role !== roleFilter) return false;
@@ -54,21 +50,34 @@ export const UserManagement: React.FC = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser = await api.users.create({
-      ...formData,
-      avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
-      password: 'ChangeMe123!',
-    });
-    setUsers((current) => [newUser, ...current]);
-    setIsAddModalOpen(false);
+    setFormError(null);
+    try {
+      await StorageService.createUser(
+        {
+          name: formData.name,
+          email: formData.email,
+          nim_nip: formData.nim_nip,
+          phone: formData.phone,
+          department: formData.department,
+          role: formData.role,
+          status: 'ACTIVE',
+          avatar: undefined,
+        },
+        formData.password,
+      );
+      setUsers(StorageService.getUsers());
+      setIsAddModalOpen(false);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Gagal menyimpan pengguna.');
+    }
   };
 
-  const handleToggleStatus = async (id: string) => {
+  const handleToggleStatus = (id: string) => {
     const user = users.find((u) => u.id === id);
     if (!user) return;
     const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-    const updated = await api.users.update(id, { status: newStatus });
-    setUsers((current) => current.map((item) => item.id === updated.id ? updated : item));
+    StorageService.updateUser(id, { status: newStatus });
+    setUsers(StorageService.getUsers());
   };
 
   return (
@@ -274,6 +283,18 @@ export const UserManagement: React.FC = () => {
               <option value="UPT Laboratorium Kesehatan">UPT Laboratorium Kesehatan</option>
             </Select>
           </div>
+
+          <Input
+            label="Password Awal"
+            type="password"
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            placeholder="Minimal 6 karakter"
+            minLength={6}
+            required
+          />
+
+          {formError && <p className="text-xs font-medium text-rose-600">{formError}</p>}
 
           <div className="pt-2 flex items-center justify-end gap-2">
             <Button variant="ghost" size="sm" type="button" onClick={() => setIsAddModalOpen(false)}>

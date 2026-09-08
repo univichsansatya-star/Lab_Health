@@ -39,8 +39,8 @@ export const LoginPage: React.FC = () => {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      emailOrNim: 'siti.nurhaliza@mhs.ichsansatya.ac.id',
-      password: 'password123',
+      emailOrNim: '',
+      password: '',
       rememberMe: true,
     },
   });

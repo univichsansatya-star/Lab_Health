@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/src/context/AuthContext';
-import { api } from '@/src/services/api';
+import { StorageService } from '@/src/services/storage';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import {
@@ -19,21 +19,20 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 export const StudentProfile: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [phone, setPhone] = useState(user?.phone || '0812-3456-7890');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const [userRequests, setUserRequests] = useState<any[]>([]);
-  useEffect(() => { if (user) api.borrowings.getAll().then(setUserRequests).catch(console.error); }, [user]);
+  const userRequests = StorageService.getRequests().filter((r) => r.userId === user?.id);
   const totalBorrowed = userRequests.length;
   const returnedOnTime = userRequests.filter((r) => r.status === 'RETURNED').length;
   const overdueCount = userRequests.filter((r) => r.status === 'OVERDUE').length;
 
   const handleSave = async () => {
-    await api.auth.updateUser({ phone });
+    await updateProfile({ phone });
     setSaveSuccess(true);
     setIsEditing(false);
     setTimeout(() => setSaveSuccess(false), 3000);
@@ -72,7 +71,7 @@ export const StudentProfile: React.FC = () => {
             </h1>
 
             <p className="text-xs text-slate-600 font-medium">
-              NIM: <strong className="text-slate-900">{user?.nim_nip}</strong> • {user?.department} • Semester 6
+               NIM: <strong className="text-slate-900">{user?.nim_nip}</strong> • {user?.department} • Semester {user?.semester}
             </p>
 
             <p className="text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-1.5 pt-1">

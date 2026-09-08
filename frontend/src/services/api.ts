@@ -1,57 +1,254 @@
-import { Equipment, BorrowingRequest, User, MaintenanceRecord, Notification, LabRoom } from '../types';
+import {
+  Equipment,
+  BorrowingRequest,
+  User,
+  MaintenanceRecord,
+  Notification,
+  LabRoom,
+} from '../types';
 
-export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
-type AuthResponse = { access: string; refresh: string; user: User };
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/backend-api';
 
-async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
-  const access = localStorage.getItem('access_token');
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(access ? { Authorization: `Bearer ${access}` } : {}), ...options.headers },
-  });
-  if (response.status === 401 && retry && localStorage.getItem('refresh_token')) {
-    const refresh = await fetch(`${API_BASE_URL}/auth/refresh/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh: localStorage.getItem('refresh_token') }) });
-    if (refresh.ok) {
-      localStorage.setItem('access_token', (await refresh.json()).access);
-      return request<T>(path, options, false);
+const ACCESS_TOKEN_KEY = 'uis_healthlab_access_token';
+const REFRESH_TOKEN_KEY = 'uis_healthlab_refresh_token';
+
+type AuthResponse = {
+  access: string;
+  refresh: string;
+  user: User;
+};
+
+const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
+
+const setTokens = (data: Pick<AuthResponse, 'access' | 'refresh'>) => {
+  localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
+  localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
+};
+
+const clearTokens = () => {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+const refreshAccessToken = async () => {
+  const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refresh) return false;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ refresh }),
+    });
+    if (!response.ok) return false;
+    const payload = (await response.json()) as { access?: string };
+    if (!payload.access) return false;
+    localStorage.setItem(ACCESS_TOKEN_KEY, payload.access);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const request = async <T>(
+  path: string,
+  options: RequestInit = {},
+  authenticated = true,
+  retryAfterRefresh = true,
+): Promise<T> => {
+  const headers = new Headers(options.headers);
+  headers.set('Accept', 'application/json');
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (authenticated) {
+    const token = getAccessToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const raw = await response.text();
+  let payload: unknown = null;
+
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = raw;
     }
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
   }
-  if (!response.ok) {
-    let message = `Request failed (${response.status})`;
-    try { const error = await response.json(); message = error.detail || Object.values(error).flat().join(' ') || message; } catch { /* non-JSON error */ }
-    throw new Error(message);
-  }
-  if (response.status === 204) return undefined as T;
-  return response.json();
-}
 
-const items = <T>(data: T[] | { results: T[] }) => Array.isArray(data) ? data : data.results;
+  if (
+    response.status === 401 &&
+    authenticated &&
+    retryAfterRefresh &&
+    !path.startsWith('/auth/refresh/')
+  ) {
+    if (await refreshAccessToken()) {
+      return request<T>(path, options, authenticated, false);
+    }
+  }
+
+  if (!response.ok) {
+    const detail =
+      typeof payload === 'object' && payload !== null && 'detail' in payload
+        ? String((payload as { detail: unknown }).detail)
+        : `Request failed with status ${response.status}`;
+    const error = new Error(detail);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
+  }
+
+  return payload as T;
+};
+
+const json = (value: unknown): RequestInit => ({
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(value),
+});
+
+export const hasAccessToken = () => Boolean(getAccessToken());
 
 export const api = {
   auth: {
-    login: async (emailOrNim: string, password: string) => { const result = await request<AuthResponse>('/auth/login/', { method: 'POST', body: JSON.stringify({ email: emailOrNim, password }) }); localStorage.setItem('access_token', result.access); localStorage.setItem('refresh_token', result.refresh); return result.user; },
-    register: async (data: Record<string, unknown>) => { const result = await request<AuthResponse>('/auth/register/', { method: 'POST', body: JSON.stringify({ ...data, role: 'student' }) }); localStorage.setItem('access_token', result.access); localStorage.setItem('refresh_token', result.refresh); return result.user; },
     getCurrentUser: () => request<User>('/auth/me/'),
-    updateUser: (data: Partial<User>) => request<User>('/auth/me/', { method: 'PATCH', body: JSON.stringify(data) }),
-    logout: () => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); },
+
+    login: async (emailOrNim: string, password: string): Promise<User> => {
+      const response = await request<AuthResponse>(
+        '/auth/login/',
+        json({ emailOrNim, password }),
+        false,
+      );
+      setTokens(response);
+      return response.user;
+    },
+
+    register: async (
+      userData: Omit<User, 'id' | 'status' | 'joinedDate'>,
+      password: string,
+    ): Promise<User> => {
+      const response = await request<AuthResponse>(
+        '/auth/register/',
+        json({ ...userData, password }),
+        false,
+      );
+      setTokens(response);
+      return response.user;
+    },
+
+    logout: () => {
+      clearTokens();
+    },
+
+    getUsers: () => request<User[]>('/users/'),
+
+    updateUser: (user: User) =>
+      request<User>('/auth/me/', {
+        ...json(user),
+        method: 'PATCH',
+      }),
   },
+
+  users: {
+    create: (user: Omit<User, 'id' | 'joinedDate'>, password: string) => {
+      const { status: _status, ...payload } = user;
+      return request<User>('/users/create/', {
+        ...json({ ...payload, password }),
+        method: 'POST',
+      });
+    },
+
+    update: (id: string, updates: Partial<User>) =>
+      request<User>(`/users/${id}/`, {
+        ...json(updates),
+        method: 'PATCH',
+      }),
+  },
+
   equipment: {
-    getAll: async (query = '') => items(await request<Equipment[] | { results: Equipment[] }>(`/equipment/${query}`)),
+    getAll: () => request<Equipment[]>('/equipment/'),
+
     getById: (id: string) => request<Equipment>(`/equipment/${id}/`),
-    create: (data: Partial<Equipment>) => request<Equipment>('/equipment/', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<Equipment>) => request<Equipment>(`/equipment/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
-    delete: (id: string) => request<void>(`/equipment/${id}/`, { method: 'DELETE' }).then(() => true),
+
+    create: (item: Omit<Equipment, 'id'>) =>
+      request<Equipment>('/equipment/', {
+        ...json(item),
+        method: 'POST',
+      }),
+
+    update: (item: Equipment) =>
+      request<Equipment>(`/equipment/${item.id}/`, {
+        ...json(item),
+        method: 'PATCH',
+      }),
+
+    delete: async (id: string) => {
+      await request<unknown>(`/equipment/${id}/`, { method: 'DELETE' });
+      return true;
+    },
   },
+
   borrowings: {
-    getAll: async (query = '') => items(await request<BorrowingRequest[] | { results: BorrowingRequest[] }>(`/borrowings/${query}`)),
+    getAll: () => request<BorrowingRequest[]>('/borrowings/'),
+
     getById: (id: string) => request<BorrowingRequest>(`/borrowings/${id}/`),
-    create: (data: Partial<BorrowingRequest>) => request<BorrowingRequest>('/borrowings/', { method: 'POST', body: JSON.stringify(data) }),
-    updateStatus: (id: string, status: string, details = {}) => request<BorrowingRequest>(`/borrowings/${id}/update-status/`, { method: 'POST', body: JSON.stringify({ status, ...details }) }),
+
+    create: (data: Omit<BorrowingRequest, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) =>
+      request<BorrowingRequest>('/borrowings/', {
+        ...json(data),
+        method: 'POST',
+      }),
+
+    updateStatus: (
+      id: string,
+      status: BorrowingRequest['status'],
+      details?: {
+        rejectionReason?: string;
+        adminNotes?: string;
+        handoverStaffName?: string;
+        returnStaffName?: string;
+        fineAmount?: number;
+        actualReturnDate?: string;
+      },
+    ) =>
+      request<BorrowingRequest>(`/borrowings/${id}/update-status/`, {
+        ...json({ status, ...details }),
+        method: 'POST',
+      }),
   },
-  maintenance: { getAll: async () => items(await request<MaintenanceRecord[] | { results: MaintenanceRecord[] }>('/maintenance/')), create: (data: Partial<MaintenanceRecord>) => request<MaintenanceRecord>('/maintenance/', { method: 'POST', body: JSON.stringify(data) }), updateStatus: (id: string, status: string, notes?: string, cost?: number) => request<MaintenanceRecord>(`/maintenance/${id}/update-status/`, { method: 'POST', body: JSON.stringify({ status, notes, cost }) }) },
-  notifications: { getAll: async () => items(await request<Notification[] | { results: Notification[] }>('/notifications/')), markAsRead: (id: string) => request<void>(`/notifications/${id}/read/`, { method: 'POST' }), markAllAsRead: () => request<void>('/notifications/read-all/', { method: 'POST' }) },
-  rooms: { getAll: async () => items(await request<LabRoom[] | { results: LabRoom[] }>('/rooms/')) },
-  users: { getAll: async () => items(await request<User[] | { results: User[] }>('/users/')), create: (data: Record<string, unknown>) => request<User>('/users/', { method: 'POST', body: JSON.stringify(data) }), update: (id: string, data: Partial<User>) => request<User>(`/users/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }) },
+
+  maintenance: {
+    getAll: () => request<MaintenanceRecord[]>('/maintenance/'),
+
+    create: (data: Omit<MaintenanceRecord, 'id' | 'ticketNumber' | 'reportedDate'>) =>
+      request<MaintenanceRecord>('/maintenance/', {
+        ...json(data),
+        method: 'POST',
+      }),
+
+    updateStatus: (
+      id: string,
+      status: MaintenanceRecord['status'],
+      notes?: string,
+      cost?: number,
+    ) =>
+      request<MaintenanceRecord>(`/maintenance/${id}/update-status/`, {
+        ...json({ status, notes, cost }),
+        method: 'POST',
+      }),
+  },
+
+  notifications: {
+    getAll: (_userId?: string, _role?: string) => request<Notification[]>('/notifications/'),
+
+    markAsRead: (id: string) =>
+      request<Notification>(`/notifications/${id}/read/`, { method: 'POST' }),
+
+    markAllAsRead: () => request<{ updated: number }>('/notifications/read-all/', { method: 'POST' }),
+  },
+
+  rooms: {
+    getAll: () => request<LabRoom[]>('/rooms/'),
+  },
 };

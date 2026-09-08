@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
@@ -9,6 +9,7 @@ import {
   Activity,
   ShieldCheck,
   Clock,
+  QrCode,
   ArrowRight,
   Sparkles,
   BookOpen,
@@ -19,42 +20,39 @@ import {
   Award,
   ChevronRight,
 } from 'lucide-react';
-import { api } from '@/src/services/api';
-import { LabRoom } from '@/src/types';
+import { StorageService } from '@/src/services/storage';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [rooms, setRooms] = useState<LabRoom[]>([]);
-
-  useEffect(() => {
-    api.rooms.getAll().then(setRooms).catch(() => setRooms([]));
-  }, []);
+  const equipment = StorageService.getEquipment();
+  const rooms = StorageService.getRooms();
+  const featuredEquipment = equipment[0];
 
   const categories = [
     {
       title: 'Nursing Skills & KDK',
-      count: '18 Alat',
+      count: `${equipment.filter((item) => item.category === 'Nursing Skills').length} Alat`,
       desc: 'Manikin IV arm, infus pump, set kateterisasi, NGT & perawatan luka',
       icon: Stethoscope,
       bg: 'bg-blue-50 text-blue-600',
     },
     {
       title: 'Emergency & Critical Care',
-      count: '12 Alat',
+      count: `${equipment.filter((item) => item.category === 'Emergency & Critical Care').length} Alat`,
       desc: 'Defibrillator AED trainer, suction pump, syringe pump, simulator CPR',
       icon: HeartPulse,
       bg: 'bg-rose-50 text-rose-600',
     },
     {
       title: 'Maternitas & Anak',
-      count: '10 Alat',
+      count: `${equipment.filter((item) => item.category === 'Maternity & Child Health').length} Alat`,
       desc: 'Simulator persalinan NOELLE, dopler denyut jantung janin, timbangan bayi',
       icon: Activity,
       bg: 'bg-teal-50 text-teal-600',
     },
     {
       title: 'Diagnostic & Vital Signs',
-      count: '24 Alat',
+      count: `${equipment.filter((item) => item.category === 'Diagnostic & Vital Signs').length} Alat`,
       desc: 'Stetoskop Littmann, tensimeter aneroid, EKG 12-lead, pulse oximeter',
       icon: ShieldCheck,
       bg: 'bg-cyan-50 text-cyan-600',
@@ -75,7 +73,7 @@ export const LandingPage: React.FC = () => {
     {
       step: '03',
       title: 'Verifikasi & Pengambilan',
-      desc: 'Tunjukkan nomor tiket di meja lab untuk serah terima bersama petugas lab Ners.',
+      desc: 'Tunjukkan QR tiket di meja lab untuk serah terima bersama petugas lab Ners.',
     },
     {
       step: '04',
@@ -139,7 +137,7 @@ export const LandingPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-cyan-600" />
-                  <span>Verifikasi Tiket Manual</span>
+                  <span>QR Ticket Fast Pickup</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-cyan-600" />
@@ -157,53 +155,62 @@ export const LandingPage: React.FC = () => {
                       <Stethoscope className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="font-heading font-bold text-sm text-slate-900">Tiket Peminjaman Aktif</h4>
-                      <p className="text-[11px] text-slate-500">Stase Keperawatan Gawat Darurat</p>
+                      <h4 className="font-heading font-bold text-sm text-slate-900">Ringkasan Laboratorium</h4>
+                      <p className="text-[11px] text-slate-500">Data langsung dari server Django</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
-                    Siap Diambil
+                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                    featuredEquipment
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                      : 'bg-amber-100 text-amber-800 border-amber-200'
+                  }`}>
+                    {featuredEquipment ? 'Data tersedia' : 'Belum ada data'}
                   </span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Peminjam:</span>
-                    <span className="font-bold text-slate-800">Siti Nurhaliza Putri (S1 Ners)</span>
+                    <span className="text-slate-500 font-medium">Data alat:</span>
+                    <span className="font-bold text-slate-800">{equipment.length} item</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Ruang Lab:</span>
-                    <span className="font-bold text-slate-800">Lab ICU & Gadar - Gd. B Lt. 1</span>
+                    <span className="text-slate-500 font-medium">Ruang laboratorium:</span>
+                    <span className="font-bold text-slate-800">{rooms.length} ruang</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Nomor Tiket:</span>
+                    <span className="text-slate-500 font-medium">Sumber data:</span>
                     <span className="font-mono font-bold text-cyan-700 bg-white px-2 py-0.5 rounded border border-slate-200">
-                      REQ-202608-0042
+                      Django API
                     </span>
                   </div>
                 </div>
 
-                {/* Items in ticket preview */}
                 <div className="space-y-2">
                   <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    Daftar Alat Disetujui
+                    Data alat terbaru
                   </p>
-                  <div className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-white">
-                    <img
-                      src="https://images.unsplash.com/photo-1516549655169-df83a0774514?w=100&auto=format&fit=crop&q=80"
-                      alt="Manikin CPR"
-                      className="w-12 h-12 rounded-lg object-cover bg-slate-100"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">
-                        Manikin Resusitasi CPR QCPR Wireless
-                      </p>
-                      <p className="text-[11px] text-slate-500">1 Unit • Laerdal Medical</p>
+                  {featuredEquipment ? (
+                    <div className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-white">
+                      <img
+                        src={featuredEquipment.imageUrl}
+                        alt={featuredEquipment.name}
+                        className="w-12 h-12 rounded-lg object-cover bg-slate-100"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">{featuredEquipment.name}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {featuredEquipment.availableQuantity} unit tersedia • {featuredEquipment.brand}
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                        Aktif
+                      </span>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                      Tersedia
-                    </span>
-                  </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+                      Belum ada data alat pada database.
+                    </div>
+                  )}
                 </div>
 
                 <Button
@@ -212,18 +219,18 @@ export const LandingPage: React.FC = () => {
                   className="w-full"
                   onClick={() => navigate('/student/borrowings')}
                 >
-                  Lihat Detail Verifikasi Peminjaman
+                  Buka Katalog Alat
                 </Button>
               </div>
 
               {/* Floating pill */}
               <div className="absolute -bottom-4 -left-4 bg-white/95 backdrop-blur-sm rounded-2xl p-3.5 shadow-lg border border-slate-200 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5" />
+                  <QrCode className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900">Verifikasi Manual</p>
-                  <p className="text-[10px] text-slate-500">Menunggu persetujuan staff lab</p>
+                  <p className="text-xs font-bold text-slate-900">Verifikasi QR Code</p>
+                  <p className="text-[10px] text-slate-500">Tanpa formulir kertas manual</p>
                 </div>
               </div>
             </div>
@@ -379,9 +386,6 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
           ))}
-          {rooms.length === 0 && (
-            <p className="col-span-full text-sm text-slate-500">Data ruang laboratorium belum tersedia.</p>
-          )}
         </div>
       </section>
 

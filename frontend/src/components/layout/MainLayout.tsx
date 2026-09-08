@@ -81,11 +81,7 @@ export const MainLayout: React.FC = () => {
                 </p>
                 <p className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                  <span>lab.kesehatan@ichsansatya.ac.id</span>
-                </p>
-                <p className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                  <span>(021) 7345-9921 / Ext. 204</span>
+                  <span>Kontak layanan dikelola oleh administrator laboratorium.</span>
                 </p>
               </div>
             </div>
