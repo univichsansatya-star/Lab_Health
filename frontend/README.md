@@ -2,19 +2,51 @@
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# UIS Health Lab
 
-This contains everything you need to run your app locally.
+Frontend React untuk sistem peminjaman alat laboratorium. Backend Django dijalankan dari folder `backend`.
 
-View your app in AI Studio: https://ai.studio/apps/76bb8db1-d61a-4b7d-9e05-4a1e9e347c89
+## Menjalankan seluruh project
 
-## Run Locally
+Dari root project, buka PowerShell dan jalankan:
 
-**Prerequisites:**  Node.js
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\run-dev.ps1
+```
 
+Script akan:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Memastikan Node.js, npm, dan Python tersedia.
+2. Menginstal dependency backend jika import package gagal.
+3. Menjalankan `npm install` jika `frontend/node_modules` belum ada.
+4. Memeriksa konfigurasi Django dan koneksi MySQL.
+5. Menjalankan backend di `http://127.0.0.1:8000`.
+6. Menjalankan frontend di `http://localhost:3000`.
+
+Migration tidak dijalankan otomatis untuk mencegah perubahan schema database tanpa sengaja. Jika database memang membutuhkan migration, jalankan:
+
+```powershell
+.\run-dev.ps1 -ApplyMigrations
+```
+
+## Menjalankan manual
+
+Terminal backend:
+
+```powershell
+cd backend
+python -m pip install -r requirements.txt
+python manage.py check --database default
+python manage.py runserver 127.0.0.1:8000
+```
+
+Terminal frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Pastikan `backend/.env` tersedia dan berisi konfigurasi database MySQL. Jangan commit file `.env` karena berisi kredensial.

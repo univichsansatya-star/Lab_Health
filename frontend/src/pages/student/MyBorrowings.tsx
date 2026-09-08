@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/context/AuthContext';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { BorrowingRequest, BorrowingStatus } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select } from '@/src/components/ui/Input';
@@ -11,7 +11,6 @@ import {
   Search,
   Calendar,
   Clock,
-  QrCode,
   ArrowRight,
   Filter,
   Plus,
@@ -28,8 +27,11 @@ export const MyBorrowings: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [allUserRequests, setAllUserRequests] = useState<BorrowingRequest[]>([]);
 
-  const allUserRequests = StorageService.getRequests().filter((r) => r.userId === user?.id);
+  useEffect(() => {
+    if (user) api.borrowings.getAll().then(setAllUserRequests).catch(console.error);
+  }, [user]);
 
   const filteredRequests = useMemo(() => {
     return allUserRequests.filter((req) => {
@@ -68,7 +70,7 @@ export const MyBorrowings: React.FC = () => {
             Daftar & Riwayat Peminjaman Alat
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Lacak status permohonan, ambil tiket QR lab, dan pantau masa pengembalian alat praktikum
+            Lacak status permohonan dan pantau masa pengembalian alat praktikum
           </p>
         </div>
 
@@ -195,8 +197,8 @@ export const MyBorrowings: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 text-cyan-700 font-bold group-hover:translate-x-1 transition-transform">
-                    <QrCode className="w-4 h-4 text-cyan-600" />
-                    <span>Lihat Tiket & QR Code Serah Terima →</span>
+                    <FileText className="w-4 h-4 text-cyan-600" />
+                    <span>Lihat Tiket & Detail Peminjaman →</span>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/src/context/AuthContext';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import {
@@ -13,27 +13,27 @@ import {
   Clock,
   CheckCircle2,
   AlertOctagon,
-  Sparkles,
   BookOpen,
-  ArrowRight,
   LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const StudentProfile: React.FC = () => {
-  const { user, logout, switchRoleUser } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [phone, setPhone] = useState(user?.phone || '0812-3456-7890');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const userRequests = StorageService.getRequests().filter((r) => r.userId === user?.id);
+  const [userRequests, setUserRequests] = useState<any[]>([]);
+  useEffect(() => { if (user) api.borrowings.getAll().then(setUserRequests).catch(console.error); }, [user]);
   const totalBorrowed = userRequests.length;
   const returnedOnTime = userRequests.filter((r) => r.status === 'RETURNED').length;
   const overdueCount = userRequests.filter((r) => r.status === 'OVERDUE').length;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    await api.auth.updateUser({ phone });
     setSaveSuccess(true);
     setIsEditing(false);
     setTimeout(() => setSaveSuccess(false), 3000);
@@ -168,31 +168,6 @@ export const StudentProfile: React.FC = () => {
         </div>
       </div>
 
-      {/* Switch to Staff Portal Demo Box */}
-      <div className="p-6 rounded-3xl bg-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="space-y-1 text-center sm:text-left">
-          <h4 className="font-heading font-bold text-base flex items-center justify-center sm:justify-start gap-2">
-            <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span>Akses Portal Staff & Koordinator Lab</span>
-          </h4>
-          <p className="text-xs text-slate-400">
-            Ingin mencoba alur verifikasi persetujuan, manajemen barcode QR, dan inventaris lab sebagai Staff?
-          </p>
-        </div>
-
-        <Button
-          variant="secondary"
-          size="md"
-          className="bg-cyan-500 hover:bg-cyan-600 text-white border-cyan-400 flex-shrink-0"
-          onClick={() => {
-            switchRoleUser('u4'); // Switch to Ns. Hendra (Staff)
-            navigate('/staff/dashboard');
-          }}
-          rightIcon={<ArrowRight className="w-4 h-4" />}
-        >
-          Masuk Portal Staff Lab
-        </Button>
-      </div>
     </div>
   );
 };

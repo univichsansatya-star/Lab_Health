@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { BorrowingRequest, BorrowingStatus } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select, Textarea } from '@/src/components/ui/Input';
@@ -18,7 +18,6 @@ import {
   UserCheck,
   FileText,
   AlertTriangle,
-  QrCode,
   PackageCheck,
 } from 'lucide-react';
 import { formatDate } from '@/src/lib/utils';
@@ -27,7 +26,7 @@ export const BorrowingRequestsManagement: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [requests, setRequests] = useState<BorrowingRequest[]>(() => StorageService.getRequests());
+  const [requests, setRequests] = useState<BorrowingRequest[]>([]);
   const [activeTab, setActiveTab] = useState<string>(searchParams.get('status') || 'ALL');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
 
@@ -35,6 +34,10 @@ export const BorrowingRequestsManagement: React.FC = () => {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [selectedReq, setSelectedReq] = useState<BorrowingRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  useEffect(() => {
+    api.borrowings.getAll().then(setRequests).catch(console.error);
+  }, []);
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
@@ -51,15 +54,13 @@ export const BorrowingRequestsManagement: React.FC = () => {
     });
   }, [requests, activeTab, searchQuery]);
 
-  const handleApprove = (id: string) => {
-    const updated = StorageService.updateRequestStatus(
+  const handleApprove = async (id: string) => {
+    const updated = await api.borrowings.updateStatus(
       id,
       'READY_TO_PICKUP',
-      'Permohonan disetujui. Alat telah disiapkan di Meja Layanan Lab Gedung B Lt. 2.'
+      { adminNotes: 'Permohonan disetujui. Alat telah disiapkan di Meja Layanan Lab Gedung B Lt. 2.' }
     );
-    if (updated) {
-      setRequests(StorageService.getRequests());
-    }
+    setRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
   };
 
   const handleOpenReject = (req: BorrowingRequest) => {
@@ -68,28 +69,24 @@ export const BorrowingRequestsManagement: React.FC = () => {
     setIsRejectModalOpen(true);
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!selectedReq) return;
-    const updated = StorageService.updateRequestStatus(
+    const updated = await api.borrowings.updateStatus(
       selectedReq.id,
       'REJECTED',
-      rejectReason || 'Permohonan ditolak oleh staff laboratorium.'
+      { rejectionReason: rejectReason || 'Permohonan ditolak oleh staff laboratorium.' }
     );
-    if (updated) {
-      setRequests(StorageService.getRequests());
-      setIsRejectModalOpen(false);
-    }
+    setRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
+    setIsRejectModalOpen(false);
   };
 
-  const handleHandover = (id: string) => {
-    const updated = StorageService.updateRequestStatus(
+  const handleHandover = async (id: string) => {
+    const updated = await api.borrowings.updateStatus(
       id,
       'BORROWED',
-      'Serah terima alat praktikum selesai di meja lab. Mahasiswa bertanggung jawab penuh.'
+      { adminNotes: 'Serah terima alat praktikum selesai di meja lab. Mahasiswa bertanggung jawab penuh.' }
     );
-    if (updated) {
-      setRequests(StorageService.getRequests());
-    }
+    setRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
   };
 
   const tabs = [

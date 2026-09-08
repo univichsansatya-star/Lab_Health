@@ -18,8 +18,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const fetchNotifs = async () => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
     try {
-      const data = await api.notifications.getAll(user?.id, user?.role);
+      const data = await api.notifications.getAll();
       setNotifications(data);
     } catch (e) {
       console.error('Failed to load notifications', e);

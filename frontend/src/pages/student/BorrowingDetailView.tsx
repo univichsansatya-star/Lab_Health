@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { Button } from '@/src/components/ui/Button';
 import { BorrowingStatusBadge } from '@/src/components/ui/StatusBadge';
 import { UISLogo } from '@/src/components/brand/UISLogo';
 import {
   ArrowLeft,
   Printer,
-  QrCode,
   Calendar,
   Clock,
   User,
@@ -22,14 +21,18 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { formatDate, formatDateTime, formatRupiah } from '@/src/lib/utils';
-import { BorrowingStatus } from '@/src/types';
+import { BorrowingRequest, BorrowingStatus } from '@/src/types';
 
 export const BorrowingDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [request, setRequest] = useState(() => StorageService.getRequestById(id || ''));
+  const [request, setRequest] = useState<BorrowingRequest | null>(null);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (id) api.borrowings.getById(id).then(setRequest).catch(console.error);
+  }, [id]);
 
   if (!request) {
     return (
@@ -76,15 +79,12 @@ export const BorrowingDetailView: React.FC = () => {
   };
 
   const handleQuickStudentReturn = () => {
-    const updated = StorageService.updateRequestStatus(
-      request.id,
-      'RETURNED',
-      'Pengembalian dikonfirmasi di meja lab. Alat telah diperiksa petugas dalam kondisi baik.'
-    );
-    if (updated) {
+    api.borrowings.updateStatus(request.id, 'RETURN_REQUESTED', {
+      adminNotes: 'Pengembalian dikonfirmasi mahasiswa melalui portal.',
+    }).then((updated) => {
       setRequest(updated);
       setIsReturnModalOpen(false);
-    }
+    }).catch(console.error);
   };
 
   return (
@@ -283,45 +283,11 @@ export const BorrowingDetailView: React.FC = () => {
           </div>
         </div>
 
-        {/* QR Pass Box for Staff Handover */}
-        <div className="p-6 rounded-3xl bg-gradient-to-br from-cyan-900 to-slate-900 text-white text-center space-y-4">
-          <div className="w-40 h-40 bg-white p-3 rounded-2xl mx-auto flex items-center justify-center shadow-lg">
-            {/* High visual QR pass */}
-            <div className="w-full h-full border-4 border-slate-950 rounded-xl p-2 grid grid-cols-5 gap-1">
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-transparent" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-transparent" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-transparent" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-transparent" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-transparent" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-transparent" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-              <div className="bg-slate-950 rounded-xs" />
-            </div>
-          </div>
-
-          <div>
-            <p className="font-mono text-sm font-bold text-cyan-300">PASS TIKET: {request.ticketNumber}</p>
-            <p className="text-xs text-cyan-100/80 max-w-sm mx-auto mt-1">
-              Tunjukkan tampilan ini ke Petugas Laboratorium Ners saat serah terima alat atau saat pengembalian di Meja Layanan Lab.
-            </p>
-          </div>
+        <div className="p-5 rounded-2xl bg-cyan-50 border border-cyan-200 text-center space-y-2">
+          <p className="text-sm font-bold text-cyan-900">Proses manual laboratorium</p>
+          <p className="text-xs text-cyan-800">
+            Gunakan nomor tiket <strong className="font-mono">{request.ticketNumber}</strong> saat verifikasi dan serah terima oleh staff atau super admin.
+          </p>
         </div>
 
         {/* Signatures for Print */}

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { StorageService } from '@/src/services/storage';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/src/services/api';
+import { BorrowingRequest, Equipment } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Select } from '@/src/components/ui/Input';
 import { UISLogo } from '@/src/components/brand/UISLogo';
@@ -21,8 +22,9 @@ import { formatRupiah } from '@/src/lib/utils';
 export const LabReports: React.FC = () => {
   const [period, setPeriod] = useState('semester_ganjil');
 
-  const allRequests = StorageService.getRequests();
-  const allEquipment = StorageService.getEquipment();
+  const [allRequests, setAllRequests] = useState<BorrowingRequest[]>([]);
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
+  useEffect(() => { Promise.all([api.borrowings.getAll(), api.equipment.getAll()]).then(([requests, equipment]) => { setAllRequests(requests); setAllEquipment(equipment); }).catch(console.error); }, []);
 
   // Metric calculations
   const totalBorrowings = allRequests.length;

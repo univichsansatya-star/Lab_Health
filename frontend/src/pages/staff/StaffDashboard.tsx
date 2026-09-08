@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/context/AuthContext';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { BorrowingStatusBadge, ConditionBadge } from '@/src/components/ui/StatusBadge';
@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   Wrench,
   Search,
-  QrCode,
   ArrowRight,
   Sparkles,
   CheckCircle2,
@@ -29,9 +28,10 @@ export const StaffDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [requests, setRequests] = useState<BorrowingRequest[]>(() => StorageService.getRequests());
+  const [requests, setRequests] = useState<BorrowingRequest[]>([]);
   const [quickSearch, setQuickSearch] = useState('');
-  const equipment = StorageService.getEquipment();
+  const [equipment, setEquipment] = useState<any[]>([]);
+  useEffect(() => { Promise.all([api.borrowings.getAll(), api.equipment.getAll()]).then(([r, e]) => { setRequests(r); setEquipment(e); }).catch(console.error); }, []);
 
   // KPIs
   const pendingRequests = requests.filter((r) => r.status === 'PENDING');
@@ -41,15 +41,13 @@ export const StaffDashboard: React.FC = () => {
   const maintenanceCount = equipment.reduce((sum, e) => sum + e.maintenanceQuantity, 0);
   const lowStockEquipment = equipment.filter((e) => e.availableQuantity <= 2 && e.availableQuantity > 0);
 
-  const handleQuickApprove = (id: string) => {
-    const updated = StorageService.updateRequestStatus(
+  const handleQuickApprove = async (id: string) => {
+    const updated = await api.borrowings.updateStatus(
       id,
       'READY_TO_PICKUP',
-      'Disetujui oleh Staff Lab. Alat siap diambil di Meja Layanan Lab.'
+      { adminNotes: 'Disetujui oleh Staff Lab. Alat siap diambil di Meja Layanan Lab.' }
     );
-    if (updated) {
-      setRequests(StorageService.getRequests());
-    }
+    setRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
   };
 
   const handleQuickSearchSubmit = (e: React.FormEvent) => {
@@ -85,13 +83,13 @@ export const StaffDashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Quick Ticket / QR Code Search Box */}
+        {/* Quick manual ticket search box */}
         <form onSubmit={handleQuickSearchSubmit} className="flex items-center gap-2 max-w-md w-full">
           <Input
-            placeholder="Scan / Ketik No. Tiket / NIM Mahasiswa..."
+            placeholder="Ketik No. Tiket / NIM Mahasiswa..."
             value={quickSearch}
             onChange={(e) => setQuickSearch(e.target.value)}
-            leftIcon={<QrCode className="w-4 h-4 text-cyan-600" />}
+            leftIcon={<Search className="w-4 h-4 text-cyan-600" />}
           />
           <Button type="submit" variant="primary" size="md">
             Cari
@@ -126,7 +124,7 @@ export const StaffDashboard: React.FC = () => {
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>Siap Diambil</span>
             <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
-              <QrCode className="w-4 h-4" />
+              <Search className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-extrabold text-blue-600 font-heading">

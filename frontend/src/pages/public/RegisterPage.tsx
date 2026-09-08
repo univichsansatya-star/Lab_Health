@@ -30,7 +30,7 @@ const registerSchema = z
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export const RegisterPage: React.FC = () => {
-  const { login } = useAuth();
+  const { register: authRegister } = useAuth();
   const navigate = useNavigate();
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -49,8 +49,15 @@ export const RegisterPage: React.FC = () => {
 
   const onSubmit = async (data: RegisterFormValues) => {
     try {
-      // Simulate registration
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await authRegister({
+        name: data.name,
+        nim_nip: data.nim_nip,
+        email: data.email,
+        phone: data.phone,
+        department: data.department,
+        semester: Number(data.semester),
+        password: data.password,
+      });
       confetti({
         particleCount: 80,
         spread: 60,
@@ -58,7 +65,6 @@ export const RegisterPage: React.FC = () => {
       });
       setIsSuccess(true);
       setTimeout(() => {
-        login(data.email);
         navigate('/student/dashboard');
       }, 1500);
     } catch (e) {

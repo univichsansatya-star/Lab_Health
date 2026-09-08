@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StorageService } from '@/src/services/storage';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/src/services/api';
 import { User, UserRole } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select } from '@/src/components/ui/Input';
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(() => StorageService.getUsers());
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
 
@@ -32,7 +32,13 @@ export const UserManagement: React.FC = () => {
     role: 'student' as UserRole,
   });
 
-  const allRequests = StorageService.getRequests();
+  const [allRequests, setAllRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    Promise.all([api.users.getAll(), api.borrowings.getAll()])
+      .then(([userList, requests]) => { setUsers(userList); setAllRequests(requests); })
+      .catch(console.error);
+  }, []);
 
   const filteredUsers = users.filter((u) => {
     if (roleFilter !== 'ALL' && u.role !== roleFilter) return false;
@@ -46,23 +52,23 @@ export const UserManagement: React.FC = () => {
     return true;
   });
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser = StorageService.createUser({
+    const newUser = await api.users.create({
       ...formData,
-      status: 'ACTIVE',
       avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
+      password: 'ChangeMe123!',
     });
-    setUsers(StorageService.getUsers());
+    setUsers((current) => [newUser, ...current]);
     setIsAddModalOpen(false);
   };
 
-  const handleToggleStatus = (id: string) => {
+  const handleToggleStatus = async (id: string) => {
     const user = users.find((u) => u.id === id);
     if (!user) return;
     const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-    StorageService.updateUser(id, { status: newStatus });
-    setUsers(StorageService.getUsers());
+    const updated = await api.users.update(id, { status: newStatus });
+    setUsers((current) => current.map((item) => item.id === updated.id ? updated : item));
   };
 
   return (

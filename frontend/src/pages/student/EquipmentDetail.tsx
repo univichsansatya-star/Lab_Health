@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useCart } from '@/src/context/CartContext';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { Button } from '@/src/components/ui/Button';
 import { ConditionBadge } from '@/src/components/ui/StatusBadge';
 import {
@@ -14,21 +14,30 @@ import {
   FileCheck2,
   Sparkles,
   Info,
-  QrCode,
   Calendar,
   Layers,
   Plus,
   Minus,
 } from 'lucide-react';
+import { Equipment } from '@/src/types';
 
 export const EquipmentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addItem, setIsDrawerOpen } = useCart();
   const [borrowQty, setBorrowQty] = useState(1);
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
 
-  const equipment = StorageService.getEquipmentById(id || '');
-  const allEquipment = StorageService.getEquipment();
+  useEffect(() => {
+    if (!id) return;
+    Promise.all([api.equipment.getById(id), api.equipment.getAll()])
+      .then(([selected, equipmentList]) => {
+        setEquipment(selected);
+        setAllEquipment(equipmentList);
+      })
+      .catch(console.error);
+  }, [id]);
 
   if (!equipment) {
     return (
@@ -94,7 +103,7 @@ export const EquipmentDetail: React.FC = () => {
               )}
             </div>
             <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-xs px-3 py-1 rounded-xl text-xs font-mono font-bold text-slate-800 shadow-xs border border-slate-200">
-              QR: {equipment.qrCode}
+              Kode alat: {equipment.code}
             </div>
           </div>
 

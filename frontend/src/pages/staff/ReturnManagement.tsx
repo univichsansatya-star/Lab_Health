@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StorageService } from '@/src/services/storage';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/src/services/api';
 import { BorrowingRequest, EquipmentCondition } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select, Textarea } from '@/src/components/ui/Input';
@@ -9,7 +9,6 @@ import {
   Search,
   CheckCircle2,
   AlertTriangle,
-  QrCode,
   Calendar,
   User,
   ShieldCheck,
@@ -29,7 +28,8 @@ export const ReturnManagement: React.FC = () => {
   const [conditionNotes, setConditionNotes] = useState('');
   const [fineAmount, setFineAmount] = useState(0);
 
-  const allRequests = StorageService.getRequests();
+  const [allRequests, setAllRequests] = useState<BorrowingRequest[]>([]);
+  useEffect(() => { api.borrowings.getAll().then(setAllRequests).catch(console.error); }, []);
   const activeAndOverdue = allRequests.filter(
     (r) => r.status === 'BORROWED' || r.status === 'OVERDUE' || r.status === 'READY_TO_PICKUP'
   );
@@ -70,18 +70,17 @@ export const ReturnManagement: React.FC = () => {
     }
   };
 
-  const handleProcessReturn = () => {
+  const handleProcessReturn = async () => {
     if (!selectedTicket) return;
 
     const note = conditionNotes
       ? `Pengembalian diverifikasi: ${conditionNotes}`
       : 'Pengembalian di Meja Layanan Lab. Seluruh alat diperiksa dalam kondisi baik & lengkap.';
 
-    const updated = StorageService.updateRequestStatus(
+    const updated = await api.borrowings.updateStatus(
       selectedTicket.id,
       'RETURNED',
-      note,
-      fineAmount
+      { adminNotes: note, fineAmount }
     );
 
     if (updated) {
@@ -91,6 +90,7 @@ export const ReturnManagement: React.FC = () => {
         origin: { y: 0.6 },
       });
       setSelectedTicket(updated);
+      setAllRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
       setReturnSuccess(true);
     }
   };
@@ -103,7 +103,7 @@ export const ReturnManagement: React.FC = () => {
           Meja Layanan Pengembalian Alat Lab
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Scan QR tiket atau masukkan NIM mahasiswa untuk memverifikasi kondisi fisik dan menyelesaikan pengembalian
+          Masukkan nomor tiket atau NIM mahasiswa untuk memverifikasi kondisi fisik dan menyelesaikan pengembalian secara manual
         </p>
       </div>
 
@@ -115,7 +115,7 @@ export const ReturnManagement: React.FC = () => {
               placeholder="Masukkan Nomor Tiket (REQ-xxxx) atau NIM Mahasiswa..."
               value={searchTicket}
               onChange={(e) => setSearchTicket(e.target.value)}
-              leftIcon={<QrCode className="w-4 h-4 text-cyan-600" />}
+              leftIcon={<Search className="w-4 h-4 text-cyan-600" />}
             />
           </div>
           <Button type="submit" variant="primary" size="md">

@@ -34,6 +34,17 @@ import { MaintenanceManagement } from './pages/staff/MaintenanceManagement';
 import { LabReports } from './pages/staff/LabReports';
 import { UserManagement } from './pages/staff/UserManagement';
 import { StaffSettings } from './pages/staff/StaffSettings';
+import { useAuth } from './context/AuthContext';
+
+function ProtectedRoute({ children, staffOnly = false }: { children: React.ReactNode; staffOnly?: boolean }) {
+  const { isAuthenticated, isLoading, role } = useAuth();
+
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (staffOnly && role !== 'admin' && role !== 'nurse_staff') return <Navigate to="/student/dashboard" replace />;
+
+  return <>{children}</>;
+}
 
 export default function App() {
   return (
@@ -52,16 +63,16 @@ export default function App() {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
                 {/* Student specific portal paths */}
-                <Route path="/student/dashboard" element={<StudentDashboard />} />
-                <Route path="/student/request-wizard" element={<BorrowingRequestWizard />} />
-                <Route path="/student/borrowings" element={<MyBorrowings />} />
-                <Route path="/student/borrowings/:id" element={<BorrowingDetailView />} />
-                <Route path="/student/notifications" element={<StudentNotifications />} />
-                <Route path="/student/profile" element={<StudentProfile />} />
+                <Route path="/student/dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+                <Route path="/student/request-wizard" element={<ProtectedRoute><BorrowingRequestWizard /></ProtectedRoute>} />
+                <Route path="/student/borrowings" element={<ProtectedRoute><MyBorrowings /></ProtectedRoute>} />
+                <Route path="/student/borrowings/:id" element={<ProtectedRoute><BorrowingDetailView /></ProtectedRoute>} />
+                <Route path="/student/notifications" element={<ProtectedRoute><StudentNotifications /></ProtectedRoute>} />
+                <Route path="/student/profile" element={<ProtectedRoute><StudentProfile /></ProtectedRoute>} />
               </Route>
 
               {/* Staff / Admin Routes under StaffLayout */}
-              <Route path="/staff" element={<StaffLayout />}>
+              <Route path="/staff" element={<ProtectedRoute staffOnly><StaffLayout /></ProtectedRoute>}>
                 <Route index element={<Navigate to="/staff/dashboard" replace />} />
                 <Route path="dashboard" element={<StaffDashboard />} />
                 <Route path="inventory" element={<InventoryManagement />} />

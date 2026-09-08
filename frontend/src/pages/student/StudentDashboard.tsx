@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/context/AuthContext';
 import { useCart } from '@/src/context/CartContext';
 import { useNotifications } from '@/src/context/NotificationContext';
 import { Button } from '@/src/components/ui/Button';
 import { BorrowingStatusBadge } from '@/src/components/ui/StatusBadge';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import {
   Search,
   Stethoscope,
@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   ShoppingBag,
-  QrCode,
   Calendar,
   ChevronRight,
   PackageCheck,
@@ -24,6 +23,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { formatDate } from '@/src/lib/utils';
+import { BorrowingRequest, Equipment } from '@/src/types';
 
 export const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -32,8 +32,18 @@ export const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const allRequests = StorageService.getRequests().filter((r) => r.userId === user?.id);
-  const allEquipment = StorageService.getEquipment();
+  const [allRequests, setAllRequests] = useState<BorrowingRequest[]>([]);
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([api.borrowings.getAll(), api.equipment.getAll()])
+      .then(([requests, equipment]) => {
+        setAllRequests(requests);
+        setAllEquipment(equipment);
+      })
+      .catch(console.error);
+  }, [user]);
 
   // Active / in-progress borrowings
   const activeBorrowings = allRequests.filter(
@@ -238,7 +248,7 @@ export const StudentDashboard: React.FC = () => {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-cyan-600 font-mono font-bold text-xs">
-                        QR
+                        TKT
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -292,7 +302,7 @@ export const StudentDashboard: React.FC = () => {
                     onClick={() => navigate(`/student/borrowings/${nextReturnItem.id}`)}
                     className="w-full py-2.5 bg-white text-cyan-700 text-sm font-bold rounded-xl hover:bg-cyan-50 transition-colors"
                   >
-                    View Digital Pass & QR
+                    Lihat Detail Tiket
                   </button>
                 </div>
               ) : (

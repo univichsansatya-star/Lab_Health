@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { StorageService } from '@/src/services/storage';
+import React, { useState, useMemo, useEffect } from 'react';
+import { api } from '@/src/services/api';
 import { Equipment, EquipmentCategory, EquipmentCondition } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select, Textarea } from '@/src/components/ui/Input';
@@ -12,7 +12,6 @@ import {
   Plus,
   Edit2,
   Trash2,
-  QrCode,
   Download,
   Filter,
   CheckCircle2,
@@ -23,7 +22,6 @@ import {
   MapPin,
   Eye,
 } from 'lucide-react';
-import { LAB_ROOMS } from '@/src/services/mockData';
 
 const CATEGORIES: EquipmentCategory[] = [
   'Nursing Skills',
@@ -36,7 +34,7 @@ const CATEGORIES: EquipmentCategory[] = [
 ];
 
 export const InventoryManagement: React.FC = () => {
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>(() => StorageService.getEquipment());
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [conditionFilter, setConditionFilter] = useState('ALL');
@@ -46,6 +44,10 @@ export const InventoryManagement: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+
+  useEffect(() => {
+    api.equipment.getAll().then(setEquipmentList).catch(console.error);
+  }, []);
 
   // Form state for Add/Edit
   const [formData, setFormData] = useState({
@@ -106,9 +108,9 @@ export const InventoryManagement: React.FC = () => {
     setIsAddModalOpen(true);
   };
 
-  const handleSaveAdd = (e: React.FormEvent) => {
+  const handleSaveAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    const created = StorageService.createEquipment({
+    const created = await api.equipment.create({
       code: formData.code,
       name: formData.name,
       category: formData.category,
@@ -127,11 +129,9 @@ export const InventoryManagement: React.FC = () => {
       requiresSpecialApproval: formData.requiresSpecialApproval,
       isConsumable: false,
       qrCode: `QR-${formData.code}`,
-      createdAt: new Date().toISOString(),
-      lastInspectionDate: new Date().toISOString().slice(0, 10),
     });
 
-    setEquipmentList(StorageService.getEquipment());
+    setEquipmentList((current) => [created, ...current]);
     setIsAddModalOpen(false);
   };
 
@@ -158,10 +158,10 @@ export const InventoryManagement: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEquipment) return;
-    const updated = StorageService.updateEquipment(selectedEquipment.id, {
+    const updated = await api.equipment.update(selectedEquipment.id, {
       name: formData.name,
       category: formData.category,
       brand: formData.brand,
@@ -178,15 +178,14 @@ export const InventoryManagement: React.FC = () => {
     });
 
     if (updated) {
-      setEquipmentList(StorageService.getEquipment());
+      setEquipmentList((current) => current.map((item) => item.id === updated.id ? updated : item));
       setIsEditModalOpen(false);
     }
   };
 
   const handleDelete = (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus data alat ini dari inventaris lab?')) {
-      StorageService.deleteEquipment(id);
-      setEquipmentList(StorageService.getEquipment());
+      api.equipment.delete(id).then(() => setEquipmentList((current) => current.filter((item) => item.id !== id))).catch(console.error);
     }
   };
 
@@ -351,13 +350,6 @@ export const InventoryManagement: React.FC = () => {
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => handleOpenQr(item)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 transition-colors"
-                          title="Cetak Barcode QR Label"
-                        >
-                          <QrCode className="w-4 h-4" />
-                        </button>
-                        <button
                           onClick={() => handleOpenEdit(item)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 transition-colors"
                           title="Edit Data Alat"
@@ -391,7 +383,7 @@ export const InventoryManagement: React.FC = () => {
         <form onSubmit={handleSaveAdd} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Kode Alat / Barcode"
+              label="Kode Alat"
               value={formData.code}
               onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               required

@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useCart } from '@/src/context/CartContext';
 import { useAuth } from '@/src/context/AuthContext';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select, Textarea } from '@/src/components/ui/Input';
 import { EmptyState } from '@/src/components/ui/EmptyState';
@@ -23,7 +23,6 @@ import {
   ShieldCheck,
   AlertCircle,
   FileCheck,
-  QrCode,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatDate } from '@/src/lib/utils';
@@ -90,19 +89,12 @@ export const BorrowingRequestWizard: React.FC = () => {
     if (!user) return;
 
     try {
-      const newRequest = StorageService.createRequest({
-        userId: user.id,
-        userName: user.name,
-        userNim: user.nim_nip,
-        userDepartment: user.department,
-        userPhone: user.phone,
-        userRole: user.role,
+      const newRequest = await api.borrowings.create({
         purpose: data.purpose,
         courseName: data.courseName,
         supervisorLecturer: data.supervisorLecturer,
         borrowDate: data.borrowDate,
         expectedReturnDate: data.expectedReturnDate,
-        status: 'PENDING',
         items: items.map((i) => ({
           equipmentId: i.equipment.id,
           equipmentCode: i.equipment.code,
@@ -445,7 +437,7 @@ export const BorrowingRequestWizard: React.FC = () => {
         </form>
       )}
 
-      {/* STEP 4: SUCCESS RECEIPT & QR CODE PASS */}
+      {/* STEP 4: SUCCESS RECEIPT */}
       {currentStep === 4 && createdTicket && (
         <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/90 shadow-lg text-center space-y-6 max-w-xl mx-auto animate-in zoom-in-95 duration-200">
           <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
@@ -464,32 +456,10 @@ export const BorrowingRequestWizard: React.FC = () => {
             </p>
           </div>
 
-          {/* QR Code Pass Box */}
-          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/90 max-w-sm mx-auto space-y-3">
-            <div className="w-36 h-36 bg-white p-3 rounded-xl border border-slate-200 mx-auto flex items-center justify-center shadow-2xs">
-              {/* Stylized QR representation */}
-              <div className="w-full h-full border-4 border-slate-900 rounded-lg p-2 grid grid-cols-4 gap-1">
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-transparent" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-transparent" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-transparent" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-transparent" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-slate-900 rounded-xs" />
-                <div className="bg-slate-900 rounded-xs" />
-              </div>
-            </div>
-            <p className="font-mono text-xs font-bold text-cyan-800">{createdTicket.ticketNumber}</p>
-            <p className="text-[11px] text-slate-500 leading-snug">
-              Tunjukkan QR Code ini di Meja Layanan Lab Gedung B Lt. 2 saat status tiket menjadi <strong>Siap Diambil</strong>.
+          <div className="p-5 rounded-2xl bg-cyan-50 border border-cyan-200 max-w-sm mx-auto space-y-2">
+            <p className="text-sm font-bold text-cyan-900">Menunggu persetujuan staff laboratorium</p>
+            <p className="text-xs text-cyan-800 leading-relaxed">
+              Simpan nomor tiket <strong className="font-mono">{createdTicket.ticketNumber}</strong>. Staff atau super admin akan memverifikasi permohonan secara manual.
             </p>
           </div>
 

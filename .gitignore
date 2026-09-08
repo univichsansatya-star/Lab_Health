@@ -2,6 +2,11 @@ node_modules/
 build/
 dist/
 coverage/
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+*.db
 .DS_Store
 *.log
 .env*

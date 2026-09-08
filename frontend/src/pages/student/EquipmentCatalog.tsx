@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '@/src/context/CartContext';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { Equipment, EquipmentCategory } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select } from '@/src/components/ui/Input';
@@ -46,7 +46,11 @@ export const EquipmentCatalog: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name_asc' | 'available_desc' | 'popular'>('name_asc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const allEquipment = StorageService.getEquipment();
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
+
+  useEffect(() => {
+    api.equipment.getAll().then(setAllEquipment).catch(console.error);
+  }, []);
 
   const filteredEquipment = useMemo(() => {
     return allEquipment

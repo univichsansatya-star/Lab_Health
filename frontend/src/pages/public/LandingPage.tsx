@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Badge';
@@ -9,7 +9,6 @@ import {
   Activity,
   ShieldCheck,
   Clock,
-  QrCode,
   ArrowRight,
   Sparkles,
   BookOpen,
@@ -20,10 +19,16 @@ import {
   Award,
   ChevronRight,
 } from 'lucide-react';
-import { LAB_ROOMS } from '@/src/services/mockData';
+import { api } from '@/src/services/api';
+import { LabRoom } from '@/src/types';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const [rooms, setRooms] = useState<LabRoom[]>([]);
+
+  useEffect(() => {
+    api.rooms.getAll().then(setRooms).catch(() => setRooms([]));
+  }, []);
 
   const categories = [
     {
@@ -70,7 +75,7 @@ export const LandingPage: React.FC = () => {
     {
       step: '03',
       title: 'Verifikasi & Pengambilan',
-      desc: 'Tunjukkan QR tiket di meja lab untuk serah terima bersama petugas lab Ners.',
+      desc: 'Tunjukkan nomor tiket di meja lab untuk serah terima bersama petugas lab Ners.',
     },
     {
       step: '04',
@@ -134,7 +139,7 @@ export const LandingPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-cyan-600" />
-                  <span>QR Ticket Fast Pickup</span>
+                  <span>Verifikasi Tiket Manual</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-cyan-600" />
@@ -171,7 +176,7 @@ export const LandingPage: React.FC = () => {
                     <span className="font-bold text-slate-800">Lab ICU & Gadar - Gd. B Lt. 1</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Kode QR Tiket:</span>
+                    <span className="text-slate-500 font-medium">Nomor Tiket:</span>
                     <span className="font-mono font-bold text-cyan-700 bg-white px-2 py-0.5 rounded border border-slate-200">
                       REQ-202608-0042
                     </span>
@@ -214,11 +219,11 @@ export const LandingPage: React.FC = () => {
               {/* Floating pill */}
               <div className="absolute -bottom-4 -left-4 bg-white/95 backdrop-blur-sm rounded-2xl p-3.5 shadow-lg border border-slate-200 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <QrCode className="w-5 h-5" />
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900">Verifikasi QR Code</p>
-                  <p className="text-[10px] text-slate-500">Tanpa formulir kertas manual</p>
+                  <p className="text-xs font-bold text-slate-900">Verifikasi Manual</p>
+                  <p className="text-[10px] text-slate-500">Menunggu persetujuan staff lab</p>
                 </div>
               </div>
             </div>
@@ -328,7 +333,7 @@ export const LandingPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {LAB_ROOMS.map((room) => (
+          {rooms.map((room) => (
             <div
               key={room.id}
               className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs hover:border-cyan-200 transition-all flex flex-col justify-between"
@@ -374,6 +379,9 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
           ))}
+          {rooms.length === 0 && (
+            <p className="col-span-full text-sm text-slate-500">Data ruang laboratorium belum tersedia.</p>
+          )}
         </div>
       </section>
 

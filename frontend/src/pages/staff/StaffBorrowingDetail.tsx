@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { StorageService } from '@/src/services/storage';
+import { api } from '@/src/services/api';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Textarea, Select } from '@/src/components/ui/Input';
 import { BorrowingStatusBadge, ConditionBadge } from '@/src/components/ui/StatusBadge';
@@ -23,15 +23,16 @@ import {
   FileText,
 } from 'lucide-react';
 import { formatDate, formatDateTime, formatRupiah } from '@/src/lib/utils';
-import { EquipmentCondition } from '@/src/types';
+import { BorrowingRequest, EquipmentCondition } from '@/src/types';
 
 export const StaffBorrowingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [request, setRequest] = useState(() => StorageService.getRequestById(id || ''));
-  const [adminNotes, setAdminNotes] = useState(request?.adminNotes || '');
-  const [fineAmount, setFineAmount] = useState<number>(request?.fineAmount || 0);
+  const [request, setRequest] = useState<BorrowingRequest | null>(null);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [fineAmount, setFineAmount] = useState<number>(0);
+  useEffect(() => { if (id) api.borrowings.getById(id).then((value) => { setRequest(value); setAdminNotes(value.adminNotes || ''); setFineAmount(value.fineAmount || 0); }).catch(console.error); }, [id]);
 
   if (!request) {
     return (
@@ -44,12 +45,10 @@ export const StaffBorrowingDetail: React.FC = () => {
     );
   }
 
-  const handleUpdateStatus = (newStatus: any, defaultNote?: string) => {
+  const handleUpdateStatus = async (newStatus: any, defaultNote?: string) => {
     const noteToSave = adminNotes || defaultNote;
-    const updated = StorageService.updateRequestStatus(request.id, newStatus, noteToSave, fineAmount);
-    if (updated) {
-      setRequest(updated);
-    }
+    const updated = await api.borrowings.updateStatus(request.id, newStatus, { adminNotes: noteToSave, fineAmount });
+    setRequest(updated);
   };
 
   return (

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { StorageService } from '@/src/services/storage';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select, Textarea } from '@/src/components/ui/Input';
 import {
@@ -35,7 +34,8 @@ export const StaffSettings: React.FC = () => {
         'Reset semua data inventaris, tiket peminjaman, dan riwayat notifikasi ke kondisi awal demo UIS Health Lab?'
       )
     ) {
-      StorageService.resetDemoData();
+      alert('Reset data demo dinonaktifkan saat menggunakan database MySQL.');
+      return;
       confetti({
         particleCount: 100,
         spread: 70,

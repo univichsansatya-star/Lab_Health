@@ -38,6 +38,14 @@ class RegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
+class AdminUserCreateSerializer(RegistrationSerializer):
+    class Meta(RegistrationSerializer.Meta):
+        fields = RegistrationSerializer.Meta.fields
+
+    def validate_role(self, value):
+        return value
+
+
 class CampusTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = "email"
 

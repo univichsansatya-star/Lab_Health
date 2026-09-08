@@ -8,8 +8,8 @@ import { Heart, Phone, Mail, MapPin, ExternalLink, ShieldCheck } from 'lucide-re
 import { useAuth } from '@/src/context/AuthContext';
 
 export const MainLayout: React.FC = () => {
-  const { role } = useAuth();
-  const isStudent = role === 'student';
+  const { role, isAuthenticated } = useAuth();
+  const isStudent = isAuthenticated && role === 'student';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-cyan-100 selection:text-cyan-900">

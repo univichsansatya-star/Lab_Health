@@ -5,14 +5,17 @@ from rest_framework.permissions import IsAuthenticated
 
 from .models import User
 from .permissions import IsAdminOnly, IsStaffOrAdmin
-from .serializers import UserSerializer
+from .serializers import AdminUserCreateSerializer, UserSerializer
 
 
-class UserListView(generics.ListAPIView):
+class UserListView(generics.ListCreateAPIView):
     permission_classes = [IsStaffOrAdmin]
     serializer_class = UserSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "nim_nip", "email", "department"]
+
+    def get_serializer_class(self):
+        return AdminUserCreateSerializer if self.request.method == "POST" else UserSerializer
 
     def get_queryset(self):
         queryset = User.objects.all().order_by("-joined_date", "name")

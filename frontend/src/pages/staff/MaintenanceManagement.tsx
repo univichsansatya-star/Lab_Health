@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StorageService } from '@/src/services/storage';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/src/services/api';
 import { MaintenanceLog, Equipment } from '@/src/types';
 import { Button } from '@/src/components/ui/Button';
 import { Input, Select, Textarea } from '@/src/components/ui/Input';
@@ -19,10 +19,16 @@ import {
 import { formatDate, formatRupiah } from '@/src/lib/utils';
 
 export const MaintenanceManagement: React.FC = () => {
-  const [logs, setLogs] = useState<MaintenanceLog[]>(() => StorageService.getMaintenanceLogs());
-  const [equipmentList] = useState<Equipment[]>(() => StorageService.getEquipment());
+  const [logs, setLogs] = useState<MaintenanceLog[]>([]);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    Promise.all([api.maintenance.getAll(), api.equipment.getAll()])
+      .then(([records, equipment]) => { setLogs(records); setEquipmentList(equipment); })
+      .catch(console.error);
+  }, []);
 
   const [formData, setFormData] = useState({
     equipmentId: equipmentList[0]?.id || '',
@@ -33,35 +39,28 @@ export const MaintenanceManagement: React.FC = () => {
     status: 'IN_PROGRESS' as const,
   });
 
-  const handleAddLog = (e: React.FormEvent) => {
+  const handleAddLog = async (e: React.FormEvent) => {
     e.preventDefault();
     const selectedEq = equipmentList.find((e) => e.id === formData.equipmentId);
     if (!selectedEq) return;
 
-    const newLog = StorageService.createMaintenanceLog({
+    const newLog = await api.maintenance.create({
       equipmentId: selectedEq.id,
-      equipmentName: selectedEq.name,
-      equipmentCode: selectedEq.code,
-      type: formData.type,
-      description: formData.description,
+      issueDescription: formData.description,
+      reportedBy: formData.performedBy,
       cost: Number(formData.cost),
-      performedBy: formData.performedBy,
-      startDate: new Date().toISOString().slice(0, 10),
       status: formData.status,
+      priority: 'MEDIUM',
+      technician: formData.performedBy,
     });
 
-    setLogs(StorageService.getMaintenanceLogs());
+    setLogs((current) => [newLog, ...current]);
     setIsAddModalOpen(false);
   };
 
-  const handleCompleteLog = (logId: string) => {
-    const updated = StorageService.updateMaintenanceLog(logId, {
-      status: 'COMPLETED',
-      completionDate: new Date().toISOString().slice(0, 10),
-    });
-    if (updated) {
-      setLogs(StorageService.getMaintenanceLogs());
-    }
+  const handleCompleteLog = async (logId: string) => {
+    const updated = await api.maintenance.updateStatus(logId, 'COMPLETED');
+    setLogs((current) => current.map((log) => log.id === updated.id ? updated : log));
   };
 
   const filteredLogs = logs.filter((l) => {
