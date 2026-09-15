@@ -100,7 +100,7 @@ try {
 
     Write-Host '[3/6] Memeriksa port aplikasi...' -ForegroundColor Cyan
     Assert-PortAvailable 8000
-    Assert-PortAvailable 3000
+    Assert-PortAvailable 5000
 
     Write-Host '[4/6] Memeriksa konfigurasi Django dan koneksi database...' -ForegroundColor Cyan
     Invoke-Checked $Python @('manage.py', 'check', '--database', 'default') $BackendPath
@@ -120,7 +120,7 @@ try {
     Write-Host ''
     Write-Host 'Backend : http://127.0.0.1:8000' -ForegroundColor Green
     Write-Host 'API     : http://127.0.0.1:8000/api/' -ForegroundColor Green
-    Write-Host 'Frontend: http://localhost:3000' -ForegroundColor Green
+    Write-Host 'Frontend: http://localhost:5000' -ForegroundColor Green
     Write-Host 'Tekan Ctrl+C untuk menghentikan keduanya.' -ForegroundColor Yellow
 
     while (-not $BackendProcess.HasExited -and -not $FrontendProcess.HasExited) {

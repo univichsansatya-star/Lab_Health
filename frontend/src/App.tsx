@@ -13,6 +13,7 @@ import { LandingPage } from './pages/public/LandingPage';
 import { LoginPage } from './pages/public/LoginPage';
 import { RegisterPage } from './pages/public/RegisterPage';
 import { ForgotPasswordPage } from './pages/public/ForgotPasswordPage';
+import { ResetPasswordConfirmPage } from './pages/public/ResetPasswordConfirmPage';
 
 // Student Pages
 import { StudentDashboard } from './pages/student/StudentDashboard';
@@ -61,6 +62,7 @@ export default function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password/confirm" element={<ResetPasswordConfirmPage />} />
 
                 {/* Student specific portal paths */}
                 <Route path="/student/dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />

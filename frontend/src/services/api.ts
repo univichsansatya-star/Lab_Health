@@ -18,6 +18,16 @@ type AuthResponse = {
   user: User;
 };
 
+type EquipmentPayload = Omit<Equipment, 'id' | 'createdAt' | 'lastInspectionDate'>;
+type BorrowingPayload = Pick<
+  BorrowingRequest,
+  'purpose' | 'courseName' | 'supervisorLecturer' | 'borrowDate' | 'expectedReturnDate' | 'items'
+> & { adminNotes?: string };
+type MaintenancePayload = Omit<
+  MaintenanceRecord,
+  'id' | 'ticketNumber' | 'reportedDate' | 'equipmentName' | 'equipmentCode' | 'location'
+>;
+
 const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
 
 const setTokens = (data: Pick<AuthResponse, 'access' | 'refresh'>) => {
@@ -67,10 +77,13 @@ const request = async <T>(
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const requestInit: RequestInit = { ...options, headers };
+  if (['GET', 'HEAD'].includes(requestInit.method || 'GET')) {
+    delete requestInit.body;
+  }
+  const response = await fetch(`${API_BASE_URL}${path}`, requestInit);
   const raw = await response.text();
   let payload: unknown = null;
-
   if (raw) {
     try {
       payload = JSON.parse(raw);
@@ -104,6 +117,7 @@ const request = async <T>(
 };
 
 const json = (value: unknown): RequestInit => ({
+  method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(value),
 });
@@ -114,10 +128,20 @@ export const api = {
   auth: {
     getCurrentUser: () => request<User>('/auth/me/'),
 
+    requestPasswordReset: (emailOrNim: string) =>
+      request<{ detail: string }>('/auth/password-reset/', json({ emailOrNim }), false),
+
+    confirmPasswordReset: (uid: string, token: string, newPassword: string) =>
+      request<{ detail: string }>(
+        '/auth/password-reset/confirm/',
+        json({ uid, token, newPassword }),
+        false,
+      ),
+
     login: async (emailOrNim: string, password: string): Promise<User> => {
       const response = await request<AuthResponse>(
         '/auth/login/',
-        json({ emailOrNim, password }),
+        json({ email: emailOrNim, emailOrNim, password }),
         false,
       );
       setTokens(response);
@@ -171,17 +195,20 @@ export const api = {
 
     getById: (id: string) => request<Equipment>(`/equipment/${id}/`),
 
-    create: (item: Omit<Equipment, 'id'>) =>
+    create: (item: EquipmentPayload) =>
       request<Equipment>('/equipment/', {
         ...json(item),
         method: 'POST',
       }),
 
-    update: (item: Equipment) =>
-      request<Equipment>(`/equipment/${item.id}/`, {
-        ...json(item),
+    update: (idOrItem: string | Equipment, updates?: Partial<EquipmentPayload>) => {
+      const id = typeof idOrItem === 'string' ? idOrItem : idOrItem.id;
+      const payload = typeof idOrItem === 'string' ? updates : idOrItem;
+      return request<Equipment>(`/equipment/${id}/`, {
+        ...json(payload),
         method: 'PATCH',
-      }),
+      });
+    },
 
     delete: async (id: string) => {
       await request<unknown>(`/equipment/${id}/`, { method: 'DELETE' });
@@ -194,7 +221,7 @@ export const api = {
 
     getById: (id: string) => request<BorrowingRequest>(`/borrowings/${id}/`),
 
-    create: (data: Omit<BorrowingRequest, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>) =>
+    create: (data: BorrowingPayload) =>
       request<BorrowingRequest>('/borrowings/', {
         ...json(data),
         method: 'POST',
@@ -221,7 +248,7 @@ export const api = {
   maintenance: {
     getAll: () => request<MaintenanceRecord[]>('/maintenance/'),
 
-    create: (data: Omit<MaintenanceRecord, 'id' | 'ticketNumber' | 'reportedDate'>) =>
+    create: (data: MaintenancePayload) =>
       request<MaintenanceRecord>('/maintenance/', {
         ...json(data),
         method: 'POST',

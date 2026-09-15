@@ -19,11 +19,14 @@ async function startServer() {
     }
 
     try {
-      const response = await fetch(new URL(backendPath, DJANGO_API_URL), {
+      const requestInit: RequestInit = {
         method: req.method,
         headers,
-        body: ["GET", "HEAD"].includes(req.method) ? undefined : JSON.stringify(req.body || {}),
-      });
+      };
+      if (!['GET', 'HEAD'].includes(req.method)) {
+        requestInit.body = JSON.stringify(req.body || {});
+      }
+      const response = await fetch(new URL(backendPath, DJANGO_API_URL), requestInit);
       const contentType = response.headers.get("content-type");
       if (contentType) res.setHeader("Content-Type", contentType);
       res.status(response.status).send(Buffer.from(await response.arrayBuffer()));

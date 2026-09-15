@@ -3,7 +3,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from accounts.views import LoginView, MeView, RegisterView
+from accounts.views import LoginView, MeView, RegisterView, PasswordResetRequestView, PasswordResetConfirmView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -11,6 +11,8 @@ urlpatterns = [
     path("api/auth/login/", LoginView.as_view()),
     path("api/auth/refresh/", TokenRefreshView.as_view()),
     path("api/auth/me/", MeView.as_view()),
+    path("api/auth/password-reset/", PasswordResetRequestView.as_view()),
+    path("api/auth/password-reset/confirm/", PasswordResetConfirmView.as_view()),
     path("api/users/", include("accounts.urls")),
     path("api/equipment/", include("equipment.urls")),
     path("api/borrowings/", include("borrowings.urls")),

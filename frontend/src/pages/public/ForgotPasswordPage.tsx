@@ -7,6 +7,7 @@ import { UISLogo } from '@/src/components/brand/UISLogo';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { Mail, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
+import { api } from '@/src/services/api';
 
 const forgotSchema = z.object({
   emailOrNim: z.string().min(3, 'Masukkan NIM atau Email kampus terdaftar'),
@@ -25,8 +26,8 @@ export const ForgotPasswordPage: React.FC = () => {
     resolver: zodResolver(forgotSchema),
   });
 
-  const onSubmit = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 600));
+  const onSubmit = async (data: ForgotFormValues) => {
+    await api.auth.requestPasswordReset(data.emailOrNim);
     setIsSent(true);
   };
 

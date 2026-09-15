@@ -58,6 +58,8 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
 
 class CampusTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = "email"
+    email = serializers.CharField(required=False, write_only=True)
+    emailOrNim = serializers.CharField(required=False, write_only=True)
 
     def validate(self, attrs):
         identifier = attrs.pop("emailOrNim", None) or attrs.get("email")
