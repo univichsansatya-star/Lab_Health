@@ -44,11 +44,16 @@ export const LabReports: React.FC = () => {
   const conditionMaint = allEquipment.filter((e) => e.condition === 'MAINTENANCE_REQUIRED').length;
 
   const exportReportCSV = () => {
+    const esc = (value: string) => {
+      const s = String(value ?? '');
+      const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+      return `"${guarded.replace(/"/g, '""')}"`;
+    };
     const headers = 'ID Tiket,Peminjam,NIM,Prodi,Tujuan,Dosen,Status,Tanggal Pinjam,Tanggal Kembali\n';
     const rows = allRequests
       .map(
         (r) =>
-          `"${r.ticketNumber}","${r.userName}","${r.userNim}","${r.userDepartment}","${r.purpose}","${r.supervisorLecturer}","${r.status}","${r.borrowDate}","${r.expectedReturnDate}"`
+          `${esc(r.ticketNumber)},${esc(r.userName)},${esc(r.userNim)},${esc(r.userDepartment)},${esc(r.purpose)},${esc(r.supervisorLecturer)},${esc(r.status)},${esc(r.borrowDate)},${esc(r.expectedReturnDate)}`
       )
       .join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });

@@ -24,24 +24,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!hasAccessToken()) {
-      setIsLoading(false);
-      return;
-    }
-
-    api.auth
-      .getCurrentUser()
-      .then(async (curr) => {
+    let cancelled = false;
+    (async () => {
+      await api.auth.silentRefresh();
+      if (cancelled) return;
+      if (!hasAccessToken()) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const curr = await api.auth.getCurrentUser();
         await StorageService.bootstrap();
         StorageService.setCurrentUser(curr);
         setUser(curr);
-      })
-      .catch(() => {
+      } catch {
         api.auth.logout();
         StorageService.clear();
         setUser(null);
-      })
-      .finally(() => setIsLoading(false));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = async (emailOrNim: string, password: string) => {

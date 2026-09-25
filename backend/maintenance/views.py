@@ -41,7 +41,11 @@ class MaintenanceRecordViewSet(viewsets.ModelViewSet):
             equipment.available_quantity = max(0, equipment.available_quantity - 1)
             equipment.condition = Equipment.Condition.MAINTENANCE_REQUIRED
             equipment.save(update_fields=["maintenance_quantity", "available_quantity", "condition"])
-            serializer.save(ticket_number=next_ticket_number())
+            serializer.save(
+                ticket_number=next_ticket_number(),
+                reported_by=self.request.user,
+                status=MaintenanceRecord.Status.PENDING,
+            )
 
     @action(detail=True, methods=["post"], url_path="update-status")
     def update_status(self, request, pk=None):
@@ -52,13 +56,21 @@ class MaintenanceRecordViewSet(viewsets.ModelViewSet):
         if new_status not in dict(MaintenanceRecord.Status.choices):
             return Response({"status": ["A valid status is required."]}, status=400)
         with transaction.atomic():
+            from decimal import Decimal, InvalidOperation
+
             record = MaintenanceRecord.objects.select_for_update().select_related("equipment").get(pk=record.pk)
             was_completed = record.status == MaintenanceRecord.Status.COMPLETED
             record.status = new_status
             if "notes" in request.data:
                 record.notes = request.data["notes"]
             if "cost" in request.data:
-                record.cost = request.data["cost"]
+                try:
+                    cost = Decimal(str(request.data["cost"]))
+                except (InvalidOperation, ValueError, TypeError):
+                    return Response({"cost": ["Invalid or negative cost."]}, status=400)
+                if cost < 0:
+                    return Response({"cost": ["Invalid or negative cost."]}, status=400)
+                record.cost = cost
             if new_status == MaintenanceRecord.Status.COMPLETED:
                 record.completed_date = timezone.localdate()
             record.save()

@@ -292,15 +292,15 @@ export const ReturnManagement: React.FC = () => {
 
         <div className="divide-y divide-slate-100 text-xs">
           {recentReturned.map((req) => (
-            <div key={req.id} className="py-3 flex items-center justify-between gap-3">
-              <div>
+            <div key={req.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0">
                 <span className="font-mono font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded">
                   {req.ticketNumber}
                 </span>
                 <span className="font-bold text-slate-900 ml-2">{req.userName}</span>
-                <p className="text-[11px] text-slate-500 mt-0.5">{req.purpose}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5 truncate">{req.purpose}</p>
               </div>
-              <span className="text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+              <span className="text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
                 Selesai
               </span>
             </div>

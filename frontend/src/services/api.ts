@@ -9,12 +9,8 @@ import {
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/backend-api';
 
-const ACCESS_TOKEN_KEY = 'uis_healthlab_access_token';
-const REFRESH_TOKEN_KEY = 'uis_healthlab_refresh_token';
-
 type AuthResponse = {
   access: string;
-  refresh: string;
   user: User;
 };
 
@@ -28,32 +24,31 @@ type MaintenancePayload = Omit<
   'id' | 'ticketNumber' | 'reportedDate' | 'equipmentName' | 'equipmentCode' | 'location'
 >;
 
-const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
+let accessToken: string | null = null;
 
-const setTokens = (data: Pick<AuthResponse, 'access' | 'refresh'>) => {
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
-  localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
+const getAccessToken = () => accessToken;
+
+const setAccessToken = (token: string) => {
+  accessToken = token;
 };
 
 const clearTokens = () => {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  accessToken = null;
 };
 
-const refreshAccessToken = async () => {
-  const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refresh) return false;
-
+// The refresh token lives in an HttpOnly cookie; this endpoint only needs the
+// cookie, which the browser sends automatically on a same-origin request.
+const refreshAccessToken = async (): Promise<boolean> => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/refresh/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ refresh }),
+      body: '{}',
     });
     if (!response.ok) return false;
     const payload = (await response.json()) as { access?: string };
     if (!payload.access) return false;
-    localStorage.setItem(ACCESS_TOKEN_KEY, payload.access);
+    setAccessToken(payload.access);
     return true;
   } catch {
     return false;
@@ -128,6 +123,8 @@ export const api = {
   auth: {
     getCurrentUser: () => request<User>('/auth/me/'),
 
+    silentRefresh: refreshAccessToken,
+
     requestPasswordReset: (emailOrNim: string) =>
       request<{ detail: string }>('/auth/password-reset/', json({ emailOrNim }), false),
 
@@ -144,7 +141,7 @@ export const api = {
         json({ email: emailOrNim, emailOrNim, password }),
         false,
       );
-      setTokens(response);
+      setAccessToken(response.access);
       return response.user;
     },
 
@@ -157,11 +154,16 @@ export const api = {
         json({ ...userData, password }),
         false,
       );
-      setTokens(response);
+      setAccessToken(response.access);
       return response.user;
     },
 
-    logout: () => {
+    logout: async () => {
+      try {
+        await request<unknown>('/auth/logout/', json({}), true, false);
+      } catch {
+        // Ignore errors when blacklisting a refresh token server-side.
+      }
       clearTokens();
     },
 

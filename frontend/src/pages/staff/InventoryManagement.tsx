@@ -195,11 +195,16 @@ export const InventoryManagement: React.FC = () => {
   };
 
   const exportCSV = () => {
+    const esc = (value: string) => {
+      const s = String(value ?? '');
+      const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+      return `"${guarded.replace(/"/g, '""')}"`;
+    };
     const headers = 'ID,Kode,Nama Alat,Kategori,Merk,Total,Tersedia,Dipinjam,Kondisi,Lokasi\n';
     const rows = equipmentList
       .map(
         (e) =>
-          `"${e.id}","${e.code}","${e.name}","${e.category}","${e.brand}",${e.totalQuantity},${e.availableQuantity},${e.borrowedQuantity},"${e.condition}","${e.location}"`
+          `${esc(e.id)},${esc(e.code)},${esc(e.name)},${esc(e.category)},${esc(e.brand)},${e.totalQuantity},${e.availableQuantity},${e.borrowedQuantity},${esc(e.condition)},${esc(e.location)}`
       )
       .join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });

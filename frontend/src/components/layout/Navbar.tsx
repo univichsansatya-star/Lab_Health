@@ -54,17 +54,13 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-3 focus:outline-none group">
-            <div className="w-10 h-10 bg-cyan-600 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform duration-200 group-hover:scale-105">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-                <path d="M12 5v14" />
-                <path d="M5 12h14" />
-              </svg>
+          <Link to="/" className="flex items-center gap-3 min-w-0 focus:outline-none group">
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm transition-transform duration-200 group-hover:scale-105 flex items-center justify-center flex-shrink-0">
+              <img src="/logo.png" alt="UIS Health Lab" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900 leading-none tracking-tight">UIS Health Lab</h1>
-              <p className="text-[10px] font-semibold text-cyan-600 uppercase tracking-widest mt-0.5">Universitas Ichsan Satya</p>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-slate-900 leading-none tracking-tight truncate">UIS Health Lab</h1>
+              <p className="hidden min-[420px]:block text-[10px] font-semibold text-cyan-600 uppercase tracking-widest mt-0.5 truncate">Universitas Ichsan Satya</p>
             </div>
           </Link>
 
@@ -357,7 +353,7 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
+              className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -366,7 +362,7 @@ export const Navbar: React.FC = () => {
 
         {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-100 py-3 space-y-1 animate-in slide-in-from-top-2 duration-200">
+          <div className="lg:hidden border-t border-slate-100 py-3 space-y-1 animate-in slide-in-from-top-2 duration-200">
             <Link
               to="/catalog"
               onClick={() => setIsMobileMenuOpen(false)}

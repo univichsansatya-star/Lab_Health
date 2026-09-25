@@ -55,4 +55,8 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        if "status" in request.data:
+            status_value = serializer.validated_data.get("status") or request.data.get("status")
+            user.is_active = status_value == User.Status.ACTIVE
+            user.save(update_fields=["is_active"])
         return Response(self.get_serializer(user).data)

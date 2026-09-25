@@ -56,7 +56,10 @@ class BorrowingRequestSerializer(serializers.ModelSerializer):
             "signature_student", "signature_staff", "fine_amount", "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "ticket_number", "user_id", "user_name", "user_nim", "user_department", "user_phone", "user_role", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "ticket_number", "user_id", "user_name", "user_nim", "user_department", "user_phone", "user_role", "status", "created_at", "updated_at",
+                            "actual_return_date", "rejection_reason", "admin_notes",
+                            "handover_staff_name", "return_staff_name",
+                            "signature_student", "signature_staff", "fine_amount"]
 
     def create(self, validated_data):
         from django.db import transaction
@@ -77,11 +80,19 @@ class BorrowingRequestSerializer(serializers.ModelSerializer):
                 equipment = item_data["equipment"]
                 quantity = item_data["quantity"]
                 equipment = Equipment.objects.select_for_update().get(pk=equipment.pk)
-                equipment.available_quantity = max(0, equipment.available_quantity - quantity)
+                if quantity > equipment.available_quantity:
+                    raise serializers.ValidationError({
+                        "items": (
+                            f"{equipment.name} hanya tersedia "
+                            f"{equipment.available_quantity} unit, "
+                            f"tapi Anda memesan {quantity}."
+                        )
+                    })
+                equipment.available_quantity = equipment.available_quantity - quantity
                 equipment.borrowed_quantity += quantity
                 equipment.save(update_fields=["available_quantity", "borrowed_quantity"])
                 BorrowingItem.objects.create(request=request, equipment=equipment, **{
-                    key: value for key, value in item_data.items() if key != "equipment"
+                    key: value for key, value in item_data.items() if key not in ("equipment", "condition_at_return", "return_notes")
                 })
             Notification.objects.create(
                 target_role=Notification.TargetRole.NURSE_STAFF,
@@ -99,5 +110,5 @@ class BorrowingStatusSerializer(serializers.Serializer):
     admin_notes = serializers.CharField(required=False, allow_blank=True)
     handover_staff_name = serializers.CharField(required=False, allow_blank=True)
     return_staff_name = serializers.CharField(required=False, allow_blank=True)
-    fine_amount = serializers.DecimalField(required=False, allow_null=True, max_digits=12, decimal_places=2)
+    fine_amount = serializers.DecimalField(required=False, allow_null=True, max_digits=12, decimal_places=2, min_value=0)
     actual_return_date = serializers.DateTimeField(required=False, allow_null=True)

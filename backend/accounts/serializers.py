@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -15,8 +16,18 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "joined_date"]
 
 
+class MeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id", "name", "nim_nip", "email", "role", "department",
+            "study_program", "semester", "phone", "avatar", "status", "joined_date",
+        ]
+        read_only_fields = ["id", "nim_nip", "email", "role", "status", "joined_date"]
+
+
 class RegistrationSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=12)
 
     class Meta:
         model = User
@@ -39,7 +50,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
 
 class AdminUserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=12)
 
     class Meta:
         model = User
@@ -48,10 +59,19 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
             "study_program", "semester", "phone", "avatar",
         ]
 
+    def validate_role(self, value):
+        requester = self.context["request"].user
+        if requester.role != User.Role.ADMIN and value != User.Role.STUDENT:
+            raise serializers.ValidationError(
+                "Only admins may assign privileged roles."
+            )
+        return value
+
     def create(self, validated_data):
         password = validated_data.pop("password")
         user = User(**validated_data)
         user.set_password(password)
+        user.is_staff = user.role in {User.Role.NURSE_STAFF, User.Role.ADMIN}
         user.save()
         return user
 
@@ -70,6 +90,27 @@ class CampusTokenObtainPairSerializer(TokenObtainPairSerializer):
             except User.DoesNotExist:
                 pass
         attrs["email"] = identifier
-        data = super().validate(attrs)
+
+        user = authenticate(
+            request=self.context.get("request"),
+            email=identifier,
+            password=password,
+        )
+        if user is None or not user.is_active:
+            raise AuthenticationFailed(
+                "No active account found with the given credentials",
+                "no_active_account",
+            )
+        if user.status != User.Status.ACTIVE:
+            raise AuthenticationFailed(
+                "Akun tidak aktif. Silakan hubungi administrator.",
+                "account_disabled",
+            )
+        self.user = user
+        refresh = self.get_token(user)
+        data = {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }
         data["user"] = UserSerializer(self.user).data
         return data

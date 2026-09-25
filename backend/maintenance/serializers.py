@@ -17,4 +17,11 @@ class MaintenanceRecordSerializer(serializers.ModelSerializer):
             "location", "issue_description", "reported_by", "reported_date", "status",
             "technician", "cost", "notes", "completed_date", "priority",
         ]
-        read_only_fields = ["id", "ticket_number", "reported_date", "equipment_name", "equipment_code", "location"]
+        read_only_fields = [
+            "id", "ticket_number", "reported_date", "reported_by",
+            "equipment_name", "equipment_code", "location",
+        ]
+        extra_kwargs = {
+            "cost": {"min_value": 0},
+            "status": {"read_only": True},
+        }
